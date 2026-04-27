@@ -10,6 +10,10 @@ import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
 import { XPBar } from '../../src/components/ui/XPBar';
+import {
+  formatLengthMeasurement,
+  formatWeightMeasurement
+} from '../../src/lib/measurements';
 import { getCategoryAverage } from '../../src/lib/progression';
 import { useProgress } from '../../src/store/ProgressContext';
 import { colors, radii, spacing } from '../../src/theme/theme';
@@ -40,7 +44,21 @@ export default function HomeScreen() {
           label={`Level ${levelInfo.level} progress`}
         />
         <View style={styles.statGrid}>
-          <StatPill label="Height" value={player.height} color={colors.blue} />
+          <StatPill
+            label="Height"
+            value={formatLengthMeasurement(player.heightCm, player.heightUnit)}
+            color={colors.blue}
+          />
+          <StatPill
+            label="Wingspan"
+            value={formatLengthMeasurement(player.wingspanCm, player.wingspanUnit)}
+            color={colors.purple}
+          />
+          <StatPill
+            label="Weight"
+            value={formatWeightMeasurement(player.weightKg, player.weightUnit)}
+            color={colors.orange}
+          />
           <StatPill label="Position" value={player.position} color={colors.green} />
         </View>
       </View>

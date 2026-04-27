@@ -14,7 +14,7 @@ import {
 } from '../types';
 import { colors } from '../theme/theme';
 
-export const ATTRIBUTE_MIN = 25;
+export const ATTRIBUTE_MIN = 0;
 export const ATTRIBUTE_MAX = 99;
 
 export const INTENSITY_CONFIG: Record<

@@ -18,8 +18,8 @@ export default function AttributesScreen() {
         <Text style={styles.eyebrow}>Progress dashboard</Text>
         <Text style={styles.title}>Player build attributes</Text>
         <Text style={styles.subtitle}>
-          Every attribute moves between 25 and 99. Your OVR is recalculated from
-          the full build after each workout.
+          Every attribute moves between 0 and 99. New builds start from zero,
+          and your OVR is recalculated after each workout.
         </Text>
       </View>
 

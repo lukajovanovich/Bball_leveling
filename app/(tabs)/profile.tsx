@@ -1,32 +1,77 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
+import { MeasurementPicker } from '../../src/components/ui/MeasurementPicker';
 import { PrimaryButton } from '../../src/components/ui/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
+import {
+  PLAYER_ARCHETYPES,
+  PLAYER_POSITIONS
+} from '../../src/data/playerOptions';
+import {
+  HEIGHT_RANGE_CM,
+  LENGTH_UNIT_OPTIONS,
+  WEIGHT_RANGE_KG,
+  WEIGHT_UNIT_OPTIONS,
+  WINGSPAN_RANGE_CM,
+  buildLengthOptions,
+  buildWeightOptions,
+  formatLengthMeasurement,
+  formatWeightMeasurement
+} from '../../src/lib/measurements';
+import { useAuth } from '../../src/store/AuthContext';
 import { useProgress } from '../../src/store/ProgressContext';
 import { colors, radii, spacing } from '../../src/theme/theme';
-
-const positions = ['Point Guard', 'Shooting Guard', 'Small Forward', 'Power Forward', 'Center'];
+import { LengthUnit, WeightUnit } from '../../src/types';
 
 export default function ProfileScreen() {
-  const { player, updateProfile, ovr, levelInfo } = useProgress();
+  const { user, signOut } = useAuth();
+  const { player, updateProfile, ovr, levelInfo, syncError } = useProgress();
   const [saved, setSaved] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [draft, setDraft] = useState({
     name: player.name,
-    height: player.height,
+    heightCm: player.heightCm,
+    heightUnit: player.heightUnit,
+    wingspanCm: player.wingspanCm,
+    wingspanUnit: player.wingspanUnit,
+    weightKg: player.weightKg,
+    weightUnit: player.weightUnit,
     position: player.position,
-    mainGoal: player.mainGoal
+    mainGoal: player.mainGoal,
+    archetype: player.archetype
   });
+  const heightOptions = buildLengthOptions(draft.heightUnit, HEIGHT_RANGE_CM);
+  const wingspanOptions = buildLengthOptions(draft.wingspanUnit, WINGSPAN_RANGE_CM);
+  const weightOptions = buildWeightOptions(draft.weightUnit, WEIGHT_RANGE_KG);
 
   useEffect(() => {
     setDraft({
       name: player.name,
-      height: player.height,
+      heightCm: player.heightCm,
+      heightUnit: player.heightUnit,
+      wingspanCm: player.wingspanCm,
+      wingspanUnit: player.wingspanUnit,
+      weightKg: player.weightKg,
+      weightUnit: player.weightUnit,
       position: player.position,
-      mainGoal: player.mainGoal
+      mainGoal: player.mainGoal,
+      archetype: player.archetype
     });
-  }, [player.height, player.mainGoal, player.name, player.position]);
+  }, [
+    player.archetype,
+    player.heightCm,
+    player.heightUnit,
+    player.mainGoal,
+    player.name,
+    player.position,
+    player.weightKg,
+    player.weightUnit,
+    player.wingspanCm,
+    player.wingspanUnit
+  ]);
 
   const handleSave = () => {
     updateProfile(draft);
@@ -40,8 +85,9 @@ export default function ProfileScreen() {
         <Text style={styles.eyebrow}>Profile</Text>
         <Text style={styles.title}>Shape your player identity</Text>
         <Text style={styles.subtitle}>
-          This is mock local profile data for the MVP. It is structured so the
-          same fields can later be saved to a user table.
+          Profile edits update your current player build, and signed-in users can
+          sync that data through Supabase. Height, weight, and wingspan stay
+          editable any time.
         </Text>
       </View>
 
@@ -65,20 +111,75 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Height</Text>
-          <TextInput
-            value={draft.height}
-            onChangeText={(height) => setDraft((current) => ({ ...current, height }))}
-            placeholder="6'3&quot;"
-            placeholderTextColor={colors.textSubtle}
-            style={styles.input}
+          <MeasurementPicker
+            helperText="Open the menu, scroll up or down, and save the height that fits now."
+            label="Height"
+            onUnitChange={(heightUnit) =>
+              setDraft((current) => ({
+                ...current,
+                heightUnit: heightUnit as LengthUnit
+              }))
+            }
+            onValueChange={(heightCm) =>
+              setDraft((current) => ({ ...current, heightCm }))
+            }
+            options={heightOptions}
+            selectedUnit={draft.heightUnit}
+            selectedValue={draft.heightCm}
+            unitOptions={LENGTH_UNIT_OPTIONS}
+            valueLabel={formatLengthMeasurement(draft.heightCm, draft.heightUnit)}
+          />
+        </View>
+
+        <View style={styles.field}>
+          <MeasurementPicker
+            helperText="Adjust reach whenever your build changes."
+            label="Wingspan"
+            onUnitChange={(wingspanUnit) =>
+              setDraft((current) => ({
+                ...current,
+                wingspanUnit: wingspanUnit as LengthUnit
+              }))
+            }
+            onValueChange={(wingspanCm) =>
+              setDraft((current) => ({ ...current, wingspanCm }))
+            }
+            options={wingspanOptions}
+            selectedUnit={draft.wingspanUnit}
+            selectedValue={draft.wingspanCm}
+            unitOptions={LENGTH_UNIT_OPTIONS}
+            valueLabel={formatLengthMeasurement(
+              draft.wingspanCm,
+              draft.wingspanUnit
+            )}
+          />
+        </View>
+
+        <View style={styles.field}>
+          <MeasurementPicker
+            helperText="Update weight anytime if the player gets bigger or leaner."
+            label="Weight"
+            onUnitChange={(weightUnit) =>
+              setDraft((current) => ({
+                ...current,
+                weightUnit: weightUnit as WeightUnit
+              }))
+            }
+            onValueChange={(weightKg) =>
+              setDraft((current) => ({ ...current, weightKg }))
+            }
+            options={weightOptions}
+            selectedUnit={draft.weightUnit}
+            selectedValue={draft.weightKg}
+            unitOptions={WEIGHT_UNIT_OPTIONS}
+            valueLabel={formatWeightMeasurement(draft.weightKg, draft.weightUnit)}
           />
         </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>Position</Text>
           <View style={styles.positionWrap}>
-            {positions.map((position) => {
+            {PLAYER_POSITIONS.map((position) => {
               const selected = draft.position === position;
 
               return (
@@ -98,6 +199,38 @@ export default function ProfileScreen() {
                     ]}
                   >
                     {position}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Archetype</Text>
+          <View style={styles.positionWrap}>
+            {PLAYER_ARCHETYPES.map((archetype) => {
+              const selected = draft.archetype === archetype;
+
+              return (
+                <Pressable
+                  key={archetype}
+                  accessibilityRole="button"
+                  onPress={() =>
+                    setDraft((current) => ({ ...current, archetype }))
+                  }
+                  style={[
+                    styles.positionChip,
+                    selected && styles.positionChipSelected
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.positionText,
+                      selected && styles.positionTextSelected
+                    ]}
+                  >
+                    {archetype}
                   </Text>
                 </Pressable>
               );
@@ -130,8 +263,7 @@ export default function ProfileScreen() {
         <SectionHeader title="Settings" color={colors.purple} />
         {[
           'Training reminders',
-          'Unit preferences',
-          'Cloud sync',
+          'Season goals',
           'Coach sharing'
         ].map((setting) => (
           <View key={setting} style={styles.settingRow}>
@@ -139,6 +271,39 @@ export default function ProfileScreen() {
             <Text style={styles.settingStatus}>Soon</Text>
           </View>
         ))}
+        <View style={styles.settingRow}>
+          <Text style={styles.settingTitle}>Cloud sync</Text>
+          <Text
+            style={[
+              styles.settingStatus,
+              user && !syncError ? styles.settingStatusLive : styles.settingStatusOff
+            ]}
+          >
+            {user ? (syncError ? 'Issue' : 'Connected') : 'Guest'}
+          </Text>
+        </View>
+        {user ? (
+          <PrimaryButton
+            disabled={signingOut}
+            label={signingOut ? 'Signing Out...' : 'Sign Out'}
+            icon="log-out"
+            onPress={() => {
+              setSigningOut(true);
+              void signOut().then((result) => {
+                setSigningOut(false);
+
+                if (result.success) {
+                  router.replace('/');
+                }
+              });
+            }}
+          />
+        ) : null}
+        {syncError ? (
+          <Text style={styles.syncError}>
+            Sync issue: {syncError}
+          </Text>
+        ) : null}
       </View>
     </ScreenContainer>
   );
@@ -257,5 +422,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase'
+  },
+  settingStatusLive: {
+    color: colors.success
+  },
+  settingStatusOff: {
+    color: colors.textSubtle
+  },
+  syncError: {
+    color: colors.red,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700'
   }
 });

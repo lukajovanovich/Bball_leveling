@@ -44,10 +44,19 @@ export interface AttributeCategory {
 
 export type PlayerAttributes = Record<AttributeKey, number>;
 
+export type LengthUnit = 'cm' | 'in';
+
+export type WeightUnit = 'kg' | 'lb';
+
 export interface PlayerProfile {
   id: string;
   name: string;
-  height: string;
+  heightCm: number;
+  heightUnit: LengthUnit;
+  wingspanCm: number;
+  wingspanUnit: LengthUnit;
+  weightKg: number;
+  weightUnit: WeightUnit;
   position: string;
   mainGoal: string;
   archetype: string;

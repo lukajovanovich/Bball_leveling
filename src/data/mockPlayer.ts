@@ -1,11 +1,149 @@
-import { ActivityLogItem, PlayerProfile, ProgressState } from '../types';
+import {
+  ActivityLogItem,
+  AttributeKey,
+  PlayerAttributes,
+  PlayerProfile,
+  ProgressState
+} from '../types';
 import { createInitialQuests } from './quests';
 import { colors } from '../theme/theme';
+import { ATTRIBUTE_CATEGORIES } from './attributes';
+import { PLAYER_ARCHETYPES, PLAYER_POSITIONS } from './playerOptions';
+import {
+  createDefaultMeasurements,
+  inferLengthUnit,
+  inferWeightUnit,
+  normalizeLengthUnit,
+  normalizeWeightUnit,
+  parseLengthMeasurement,
+  parseWeightMeasurement
+} from '../lib/measurements';
 
-export const samplePlayer: PlayerProfile = {
+export interface NewPlayerProfileInput {
+  name: string;
+  heightCm: number;
+  heightUnit: PlayerProfile['heightUnit'];
+  wingspanCm: number;
+  wingspanUnit: PlayerProfile['wingspanUnit'];
+  weightKg: number;
+  weightUnit: PlayerProfile['weightUnit'];
+  position: string;
+  mainGoal: string;
+  archetype: string;
+}
+
+type LegacyPlayerProfile = Partial<PlayerProfile> & {
+  height?: string;
+  wingspan?: string;
+  weight?: string;
+  heightUnit?: string;
+  wingspanUnit?: string;
+  weightUnit?: string;
+};
+
+const createAttributeRecord = (
+  initialValue: number
+): PlayerAttributes =>
+  ATTRIBUTE_CATEGORIES.reduce((attributes, category) => {
+    category.attributes.forEach((attribute) => {
+      attributes[attribute.key] = initialValue;
+    });
+
+    return attributes;
+  }, {} as Record<AttributeKey, number>);
+
+export const createZeroAttributes = () => createAttributeRecord(0);
+
+const normalizeAttributes = (
+  attributes?: Partial<Record<AttributeKey, number>>
+): PlayerAttributes => {
+  const normalizedAttributes = createZeroAttributes();
+
+  if (!attributes) {
+    return normalizedAttributes;
+  }
+
+  (Object.keys(normalizedAttributes) as AttributeKey[]).forEach((attributeKey) => {
+    const value = attributes[attributeKey];
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      normalizedAttributes[attributeKey] = value;
+    }
+  });
+
+  return normalizedAttributes;
+};
+
+export const normalizePlayerProfile = (
+  player: LegacyPlayerProfile
+): PlayerProfile => {
+  const defaultMeasurements = createDefaultMeasurements();
+  const legacyHeight =
+    typeof player.height === 'string' ? player.height : undefined;
+  const legacyWingspan =
+    typeof player.wingspan === 'string' ? player.wingspan : undefined;
+  const legacyWeight =
+    typeof player.weight === 'string' ? player.weight : undefined;
+  const heightCm =
+    typeof player.heightCm === 'number' && Number.isFinite(player.heightCm)
+      ? player.heightCm
+      : parseLengthMeasurement(legacyHeight, defaultMeasurements.heightCm);
+  const heightUnit = normalizeLengthUnit(
+    typeof player.heightUnit === 'string'
+      ? player.heightUnit
+      : inferLengthUnit(legacyHeight)
+  );
+  const wingspanCm =
+    typeof player.wingspanCm === 'number' && Number.isFinite(player.wingspanCm)
+      ? player.wingspanCm
+      : parseLengthMeasurement(
+          legacyWingspan,
+          Math.max(heightCm, defaultMeasurements.wingspanCm)
+        );
+  const wingspanUnit = normalizeLengthUnit(
+    typeof player.wingspanUnit === 'string'
+      ? player.wingspanUnit
+      : inferLengthUnit(legacyWingspan ?? legacyHeight)
+  );
+  const weightKg =
+    typeof player.weightKg === 'number' && Number.isFinite(player.weightKg)
+      ? player.weightKg
+      : parseWeightMeasurement(legacyWeight, defaultMeasurements.weightKg);
+  const weightUnit = normalizeWeightUnit(
+    typeof player.weightUnit === 'string'
+      ? player.weightUnit
+      : inferWeightUnit(legacyWeight)
+  );
+
+  return {
+    id: player.id?.trim() || `player-${Date.now()}`,
+    name: player.name?.trim() || 'MyPlayer',
+    heightCm,
+    heightUnit,
+    wingspanCm,
+    wingspanUnit,
+    weightKg,
+    weightUnit,
+    position: player.position?.trim() || PLAYER_POSITIONS[0],
+    mainGoal: player.mainGoal?.trim() || 'Build my player from the ground up',
+    archetype: player.archetype?.trim() || PLAYER_ARCHETYPES[0],
+    totalXp:
+      typeof player.totalXp === 'number' && Number.isFinite(player.totalXp)
+        ? player.totalXp
+        : 0,
+    attributes: normalizeAttributes(player.attributes)
+  };
+};
+
+export const samplePlayer: PlayerProfile = normalizePlayerProfile({
   id: 'player-1',
   name: 'Jalen Novak',
-  height: '6\'3"',
+  heightCm: 190.5,
+  heightUnit: 'in',
+  wingspanCm: 198.12,
+  wingspanUnit: 'in',
+  weightKg: 88.45,
+  weightUnit: 'lb',
   position: 'Shooting Guard',
   mainGoal: 'Become a reliable two-way shot creator',
   archetype: 'Shot-Creating Guard',
@@ -34,7 +172,35 @@ export const samplePlayer: PlayerProfile = {
     vertical: 65,
     stamina: 69
   }
-};
+});
+
+export const buildNewPlayerProfile = ({
+  name,
+  heightCm,
+  heightUnit,
+  wingspanCm,
+  wingspanUnit,
+  weightKg,
+  weightUnit,
+  position,
+  mainGoal,
+  archetype
+}: NewPlayerProfileInput): PlayerProfile =>
+  normalizePlayerProfile({
+    id: `player-${Date.now()}`,
+    name: name.trim(),
+    heightCm,
+    heightUnit,
+    wingspanCm,
+    wingspanUnit,
+    weightKg,
+    weightUnit,
+    position: position.trim(),
+    mainGoal: mainGoal.trim(),
+    archetype: archetype.trim(),
+    totalXp: 0,
+    attributes: createZeroAttributes()
+  });
 
 export const initialActivityLog: ActivityLogItem[] = [
   {
@@ -62,6 +228,36 @@ export const initialActivityLog: ActivityLogItem[] = [
     accentColor: colors.gold
   }
 ];
+
+const createNewPlayerActivityLog = (playerName: string): ActivityLogItem[] => [
+  {
+    id: `activity-new-player-${Date.now()}`,
+    type: 'attribute',
+    title: 'New MyPlayer created',
+    description: `${playerName} starts from 0 in every attribute. Train to climb toward 99.`,
+    createdAt: new Date().toISOString(),
+    accentColor: colors.blue
+  }
+];
+
+export const createProgressStateFromPlayer = (
+  player: PlayerProfile
+): ProgressState => {
+  const normalizedPlayer = normalizePlayerProfile(player);
+
+  return {
+    player: normalizedPlayer,
+    quests: createInitialQuests(normalizedPlayer.attributes),
+    trainingSessions: [],
+    activityLog: createNewPlayerActivityLog(normalizedPlayer.name),
+    lastLevelUp: null
+  };
+};
+
+export const normalizeProgressState = (state: ProgressState): ProgressState => ({
+  ...state,
+  player: normalizePlayerProfile(state.player)
+});
 
 export const createInitialProgressState = (): ProgressState => ({
   player: samplePlayer,

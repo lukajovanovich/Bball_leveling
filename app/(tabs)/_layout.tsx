@@ -1,9 +1,27 @@
 import React from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../src/theme/theme';
+import { useAuth } from '../../src/store/AuthContext';
+import { useProgress } from '../../src/store/ProgressContext';
+import { colors, spacing } from '../../src/theme/theme';
 
 export default function TabsLayout() {
+  const { isLoading: isAuthLoading } = useAuth();
+  const { isHydrating } = useProgress();
+
+  if (isAuthLoading || isHydrating) {
+    return (
+      <View style={styles.loadingRoot}>
+        <ActivityIndicator size="large" color={colors.gold} />
+        <Text style={styles.loadingTitle}>Loading your player...</Text>
+        <Text style={styles.loadingText}>
+          Syncing your latest build and attributes.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <Tabs
       initialRouteName="home"
@@ -73,3 +91,26 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingRoot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.xl
+  },
+  loadingTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '900'
+  },
+  loadingText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '600',
+    textAlign: 'center'
+  }
+});
