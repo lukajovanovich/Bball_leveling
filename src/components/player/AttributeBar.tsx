@@ -23,6 +23,7 @@ export const AttributeBar = ({ name, value, color }: AttributeBarProps) => {
       </View>
       <View style={styles.track}>
         <View
+          testID="attribute-bar-fill"
           style={[
             styles.fill,
             {

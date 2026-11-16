@@ -7,26 +7,33 @@ interface XPBarProps {
   target: number;
   label?: string;
   color?: string;
+  /** Hide the "current / target XP" text when the bar does not measure XP. */
+  showValue?: boolean;
 }
 
 export const XPBar = ({
   current,
   target,
   label = 'XP Progress',
-  color = colors.gold
+  color = colors.gold,
+  showValue = true
 }: XPBarProps) => {
-  const progress = target <= 0 ? 0 : Math.min(1, current / target);
+  const ratio = target > 0 ? current / target : 0;
+  const progress = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
 
   return (
     <View style={styles.container}>
       <View style={styles.row}>
         <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>
-          {Math.round(current)} / {Math.round(target)} XP
-        </Text>
+        {showValue ? (
+          <Text style={styles.value}>
+            {Math.round(current)} / {Math.round(target)} XP
+          </Text>
+        ) : null}
       </View>
       <View style={styles.track}>
         <View
+          testID="xp-bar-fill"
           style={[
             styles.fill,
             {

@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
   },
   "dependencies": {
     "@expo/metro-runtime": "^55.0.10",
@@ -30,7 +31,30 @@
     "react-native-web": "latest"
   },
   "devDependencies": {
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "29.5.14",
     "@types/react": "latest",
+    "jest": "~29.7.0",
+    "jest-expo": "~55.0.22",
     "typescript": "latest"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.ts"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/",
+      "/.expo/"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "app/**/*.{ts,tsx}",
+      "!src/types/**"
+    ],
+    "testMatch": [
+      "<rootDir>/__tests__/**/*.test.[jt]s?(x)"
+    ]
   }
 }

@@ -60,7 +60,7 @@ export const createInitialQuests = (attributes: PlayerAttributes): Quest[] => [
     kind: 'reach_attribute',
     attributeKey: 'ballHandle',
     rewardXp: 260,
-    progress: attributes.ballHandle,
+    progress: Math.min(attributes.ballHandle, 75),
     goal: 75,
     completed: attributes.ballHandle >= 75,
     claimed: false

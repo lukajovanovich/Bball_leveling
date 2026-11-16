@@ -5,6 +5,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from 'react';
 import {
@@ -12,6 +13,7 @@ import {
   createInitialProgressState,
   createProgressStateFromPlayer
 } from '../data/mockPlayer';
+import { describeError } from '../lib/authErrors';
 import {
   clearPendingSignupProfile,
   getPendingSignupProfile
@@ -69,6 +71,10 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
   const [state, setState] = useState<ProgressState>(() => createInitialProgressState());
   const [isHydrating, setIsHydrating] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
+  // Set only after this user's cloud save was read (or found to not exist).
+  // Until then local state is not theirs, and saving it would overwrite their
+  // real progress in the database.
+  const cloudReadyUserIdRef = useRef<string | null>(null);
 
   const persistProgressState = useCallback(
     async (nextState: ProgressState) => {
@@ -76,18 +82,21 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
         return;
       }
 
-      const { error } = await upsertPlayerProgressState(
-        user.id,
-        user.email ?? null,
-        nextState
-      );
-
-      if (error) {
-        setSyncError(error.message);
+      if (cloudReadyUserIdRef.current !== user.id) {
         return;
       }
 
-      setSyncError(null);
+      try {
+        const { error } = await upsertPlayerProgressState(
+          user.id,
+          user.email ?? null,
+          nextState
+        );
+
+        setSyncError(error ? describeError(error) : null);
+      } catch (error) {
+        setSyncError(describeError(error));
+      }
     },
     [isConfigured, user]
   );
@@ -101,6 +110,8 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       }
 
       if (!user) {
+        cloudReadyUserIdRef.current = null;
+
         if (active) {
           setState(createInitialProgressState());
           setSyncError(null);
@@ -119,21 +130,38 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
         return;
       }
 
+      cloudReadyUserIdRef.current = null;
+
       if (active) {
         setIsHydrating(true);
       }
 
-      const { data, error } = await fetchPlayerProgressState(user.id);
+      let data: ProgressState | null = null;
 
-      if (!active) {
+      try {
+        const result = await fetchPlayerProgressState(user.id);
+
+        if (!active) {
+          return;
+        }
+
+        if (result.error) {
+          setSyncError(describeError(result.error));
+          setIsHydrating(false);
+          return;
+        }
+
+        data = result.data;
+      } catch (error) {
+        if (active) {
+          setSyncError(describeError(error));
+          setIsHydrating(false);
+        }
+
         return;
       }
 
-      if (error) {
-        setSyncError(error.message);
-        setIsHydrating(false);
-        return;
-      }
+      cloudReadyUserIdRef.current = user.id;
 
       if (data) {
         clearPendingSignupProfile();
@@ -151,18 +179,26 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
 
       setState(nextState);
 
-      const { error: createError } = await upsertPlayerProgressState(
-        user.id,
-        user.email ?? null,
-        nextState
-      );
+      let createErrorMessage: string | null = null;
+
+      try {
+        const { error: createError } = await upsertPlayerProgressState(
+          user.id,
+          user.email ?? null,
+          nextState
+        );
+
+        createErrorMessage = createError ? describeError(createError) : null;
+      } catch (error) {
+        createErrorMessage = describeError(error);
+      }
 
       if (!active) {
         return;
       }
 
-      if (createError) {
-        setSyncError(createError.message);
+      if (createErrorMessage) {
+        setSyncError(createErrorMessage);
       } else {
         clearPendingSignupProfile();
         setSyncError(null);
@@ -190,20 +226,21 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
 
   const updateProfile = useCallback(
     (profile: Partial<EditableProfileFields>) => {
-      setState((current) => {
-        const nextState = {
-          ...current,
-          player: {
-            ...current.player,
-            ...profile
-          }
-        };
+      const nextState: ProgressState = {
+        ...state,
+        player: {
+          ...state.player,
+          ...profile,
+          // A blank name or goal would show up as an empty card on Home.
+          name: profile.name?.trim() || state.player.name,
+          mainGoal: profile.mainGoal?.trim() || state.player.mainGoal
+        }
+      };
 
-        void persistProgressState(nextState);
-        return nextState;
-      });
+      setState(nextState);
+      void persistProgressState(nextState);
     },
-    [persistProgressState]
+    [persistProgressState, state]
   );
 
   const createNewProfile = useCallback(

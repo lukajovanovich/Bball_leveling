@@ -9,10 +9,22 @@ The owner communicates in Serbian; code, comments, UI copy and commit messages a
 ```bash
 npm install
 npm run start       # Expo dev server (also: npm run ios / android / web)
-npm run typecheck   # tsc --noEmit — the only automated check; run it before every commit
+npm run typecheck   # tsc --noEmit
+npm test            # Jest: logic, data, contexts, components and screens
+npx jest __tests__/lib/progression.test.ts   # a single file
+npx jest --coverage                           # coverage report
 ```
 
-There is no test runner and no linter configured.
+Run `npm run typecheck` and `npm test` before every commit. There is no linter configured.
+
+## Tests
+
+- Jest with the `jest-expo` preset and `@testing-library/react-native` v14. In v14 `render`, `fireEvent` and `renderHook` are async and must be awaited; read `node_modules/@testing-library/react-native/docs/guides/llm-guidelines.md` before writing component tests.
+- Tests live in `__tests__/` (not in `app/`, where expo-router would treat them as routes) and must be named `*.test.ts(x)`. Shared helpers are in `__tests__/helpers/`.
+- Nothing hits the network: `src/lib/supabase` is replaced with `__tests__/helpers/supabaseMock.ts` via `jest.mock('../../src/lib/supabase', () => require('../helpers/supabaseMock'))`. Use `mockControls` to set the stored session, the cloud row, and errors.
+- `expo-router` and `localStorage` are stubbed globally in `jest.setup.ts`.
+- Screen tests render the real providers through `renderApp` from `__tests__/helpers/renderApp.tsx`.
+- New game rules or bug fixes need a test that fails without the change.
 
 ## Stack
 
@@ -39,6 +51,8 @@ There is no test runner and no linter configured.
 - **Schema changes** go in `supabase/schema.sql` and must be run manually in the Supabase SQL Editor — there are no migrations or CLI setup.
 - **Measurements** are always stored in metric (`heightCm`, `wingspanCm`, `weightKg`) with a separate display unit field. Convert only at the display/input edge using `src/lib/measurements.ts`.
 - **Signup flow**: the profile entered at signup is saved via `pendingSignup.ts` so it survives email confirmation, then turned into the first `player_profiles` row on first sign in.
+- **Never save before the cloud row was read**: `ProgressContext` only upserts after it has loaded (or created) the signed-in user's row. If that load fails, local state is placeholder data and saving it would overwrite the user's real progress.
+- **Error messages** shown to the user go through `describeError` in `src/lib/authErrors.ts`, which turns raw network failures ("Failed to fetch") into a readable message.
 - **Missing env**: the app must still boot without Supabase env vars (`isSupabaseConfigured` is false, placeholder client, local-only state). Keep that path working.
 - Attributes are clamped to 0–99 (`ATTRIBUTE_MIN` / `ATTRIBUTE_MAX`). Game-balance numbers (XP per level, intensity multipliers, workout effect weights) live in `src/lib/progression.ts` and `src/data/workouts.ts` — keep them there, not inline in screens.
 

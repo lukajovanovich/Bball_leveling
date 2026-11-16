@@ -175,6 +175,11 @@ export const parseLengthMeasurement = (
   }
 
   const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return fallbackValueCm;
+  }
+
   const feetAndInchesMatch = trimmedValue.match(/(\d+)\s*'\s*(\d+)?\s*(?:"|in)?/i);
 
   if (feetAndInchesMatch) {
@@ -214,6 +219,11 @@ export const parseWeightMeasurement = (
   }
 
   const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return fallbackValueKg;
+  }
+
   const kilogramsMatch = trimmedValue.match(/(\d+(?:\.\d+)?)\s*kg/i);
 
   if (kilogramsMatch) {

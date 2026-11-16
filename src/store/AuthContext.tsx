@@ -17,6 +17,7 @@ import {
   PendingSignupProfile,
   savePendingSignupProfile
 } from '../lib/pendingSignup';
+import { describeError } from '../lib/authErrors';
 import { upsertPlayerProgressState } from '../lib/playerProfileStore';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
@@ -65,13 +66,23 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         return;
       }
 
-      const {
-        data: { session: existingSession }
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session: existingSession }
+        } = await supabase.auth.getSession();
 
-      if (active) {
-        setSession(existingSession);
-        setIsLoading(false);
+        if (active) {
+          setSession(existingSession);
+        }
+      } catch {
+        // A broken stored session must not leave the app on a loading spinner.
+        if (active) {
+          setSession(null);
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -103,19 +114,26 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         };
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password
-      });
+      try {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password
+        });
 
-      if (error) {
+        if (error) {
+          return {
+            success: false,
+            message: describeError(error)
+          };
+        }
+
+        return { success: true };
+      } catch (error) {
         return {
           success: false,
-          message: error.message
+          message: describeError(error)
         };
       }
-
-      return { success: true };
     },
     []
   );
@@ -135,56 +153,73 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
       const normalizedEmail = email.trim().toLowerCase();
 
-      const {
-        data: { session: nextSession, user },
-        error
-      } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password
-      });
-
-      if (error) {
-        return {
-          success: false,
-          message: error.message
-        };
-      }
-
+      // Saved before the request: signing up fires the auth listener, and the
+      // progress loader that reacts to it must already find this profile.
       savePendingSignupProfile(profile);
 
-      if (!user) {
+      try {
+        const {
+          data: { session: nextSession, user },
+          error
+        } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password
+        });
+
+        if (error) {
+          clearPendingSignupProfile();
+
+          return {
+            success: false,
+            message: describeError(error)
+          };
+        }
+
+        if (!user) {
+          clearPendingSignupProfile();
+
+          return {
+            success: false,
+            message: 'Supabase did not return a user for this signup request.'
+          };
+        }
+
+        if (!nextSession) {
+          return {
+            success: true,
+            needsEmailConfirmation: true,
+            message:
+              'Account created. Confirm your email, then sign in to finish loading your player.'
+          };
+        }
+
+        const nextState = createProgressStateFromPlayer(
+          buildNewPlayerProfile(profile)
+        );
+        const { error: saveError } = await upsertPlayerProgressState(
+          user.id,
+          normalizedEmail,
+          nextState
+        );
+
+        if (saveError) {
+          return {
+            success: false,
+            message: describeError(saveError)
+          };
+        }
+
+        clearPendingSignupProfile();
+
+        return { success: true };
+      } catch (error) {
+        clearPendingSignupProfile();
+
         return {
           success: false,
-          message: 'Supabase did not return a user for this signup request.'
+          message: describeError(error)
         };
       }
-
-      if (!nextSession) {
-        return {
-          success: true,
-          needsEmailConfirmation: true,
-          message:
-            'Account created. Confirm your email, then sign in to finish loading your player.'
-        };
-      }
-
-      const nextState = createProgressStateFromPlayer(buildNewPlayerProfile(profile));
-      const { error: saveError } = await upsertPlayerProgressState(
-        user.id,
-        normalizedEmail,
-        nextState
-      );
-
-      if (saveError) {
-        return {
-          success: false,
-          message: saveError.message
-        };
-      }
-
-      clearPendingSignupProfile();
-
-      return { success: true };
     },
     []
   );
@@ -197,16 +232,23 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       };
     }
 
-    const { error } = await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
 
-    if (error) {
+      if (error) {
+        return {
+          success: false,
+          message: describeError(error)
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
       return {
         success: false,
-        message: error.message
+        message: describeError(error)
       };
     }
-
-    return { success: true };
   }, []);
 
   const value = useMemo(

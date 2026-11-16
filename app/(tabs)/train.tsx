@@ -7,7 +7,10 @@ import { PrimaryButton } from '../../src/components/ui/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
-import { INTENSITY_CONFIG } from '../../src/lib/progression';
+import {
+  INTENSITY_CONFIG,
+  getWorkoutDefinition
+} from '../../src/lib/progression';
 import { useProgress } from '../../src/store/ProgressContext';
 import {
   AttributeKey,
@@ -29,6 +32,12 @@ export default function TrainScreen() {
     () => WORKOUTS.find((workout) => workout.type === selectedType) ?? WORKOUTS[0],
     [selectedType]
   );
+
+  // The result card describes the workout that was logged, which may no longer
+  // be the one selected above.
+  const resultColor = lastResult
+    ? getWorkoutDefinition(lastResult.session.workoutType).accentColor
+    : selectedWorkout.accentColor;
 
   const gainEntries = lastResult
     ? (Object.entries(lastResult.attributeGains) as [AttributeKey, number][])
@@ -126,7 +135,7 @@ export default function TrainScreen() {
             <StatPill
               label="Workout XP"
               value={`+${lastResult.workoutXpGained}`}
-              color={selectedWorkout.accentColor}
+              color={resultColor}
             />
             <StatPill
               label="Quest XP"
@@ -138,7 +147,7 @@ export default function TrainScreen() {
             {gainEntries.map(([key, gain]) => (
               <View key={key} style={styles.gainPill}>
                 <Text style={styles.gainLabel}>{ATTRIBUTE_NAME_BY_KEY[key]}</Text>
-                <Text style={[styles.gainValue, { color: selectedWorkout.accentColor }]}>
+                <Text style={[styles.gainValue, { color: resultColor }]}>
                   +{gain}
                 </Text>
               </View>

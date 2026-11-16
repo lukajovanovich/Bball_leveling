@@ -12,6 +12,10 @@ export default function QuestsScreen() {
   const daily = state.quests.filter((quest) => quest.period === 'daily');
   const weekly = state.quests.filter((quest) => quest.period === 'weekly');
   const completed = state.quests.filter((quest) => quest.completed).length;
+  // XP already paid out is no longer available to earn.
+  const availableXp = state.quests
+    .filter((quest) => !quest.claimed)
+    .reduce((sum, quest) => sum + quest.rewardXp, 0);
 
   return (
     <ScreenContainer>
@@ -26,7 +30,7 @@ export default function QuestsScreen() {
 
       <View style={styles.summaryRow}>
         <StatPill label="Completed" value={`${completed}/${state.quests.length}`} color={colors.success} />
-        <StatPill label="Available XP" value={state.quests.reduce((sum, quest) => sum + quest.rewardXp, 0)} color={colors.gold} />
+        <StatPill label="Available XP" value={availableXp} color={colors.gold} />
       </View>
 
       <View style={styles.section}>

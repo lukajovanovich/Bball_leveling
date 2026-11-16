@@ -18,6 +18,7 @@ import {
   parseLengthMeasurement,
   parseWeightMeasurement
 } from '../lib/measurements';
+import { clampAttribute } from '../lib/progression';
 
 export interface NewPlayerProfileInput {
   name: string;
@@ -67,7 +68,7 @@ const normalizeAttributes = (
     const value = attributes[attributeKey];
 
     if (typeof value === 'number' && Number.isFinite(value)) {
-      normalizedAttributes[attributeKey] = value;
+      normalizedAttributes[attributeKey] = clampAttribute(value);
     }
   });
 
@@ -75,8 +76,9 @@ const normalizeAttributes = (
 };
 
 export const normalizePlayerProfile = (
-  player: LegacyPlayerProfile
+  input?: LegacyPlayerProfile | null
 ): PlayerProfile => {
+  const player: LegacyPlayerProfile = input ?? {};
   const defaultMeasurements = createDefaultMeasurements();
   const legacyHeight =
     typeof player.height === 'string' ? player.height : undefined;
@@ -129,7 +131,7 @@ export const normalizePlayerProfile = (
     archetype: player.archetype?.trim() || PLAYER_ARCHETYPES[0],
     totalXp:
       typeof player.totalXp === 'number' && Number.isFinite(player.totalXp)
-        ? player.totalXp
+        ? Math.max(0, player.totalXp)
         : 0,
     attributes: normalizeAttributes(player.attributes)
   };
@@ -254,10 +256,26 @@ export const createProgressStateFromPlayer = (
   };
 };
 
-export const normalizeProgressState = (state: ProgressState): ProgressState => ({
-  ...state,
-  player: normalizePlayerProfile(state.player)
-});
+// Rows saved by older versions of the app (or edited by hand) can be missing
+// whole sections, so every part of the state is rebuilt with safe defaults.
+export const normalizeProgressState = (
+  state?: Partial<ProgressState> | null
+): ProgressState => {
+  const player = normalizePlayerProfile(state?.player);
+
+  return {
+    ...state,
+    player,
+    quests: Array.isArray(state?.quests)
+      ? state.quests
+      : createInitialQuests(player.attributes),
+    trainingSessions: Array.isArray(state?.trainingSessions)
+      ? state.trainingSessions
+      : [],
+    activityLog: Array.isArray(state?.activityLog) ? state.activityLog : [],
+    lastLevelUp: state?.lastLevelUp ?? null
+  };
+};
 
 export const createInitialProgressState = (): ProgressState => ({
   player: samplePlayer,

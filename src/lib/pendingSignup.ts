@@ -28,7 +28,13 @@ export const getPendingSignupProfile = (): PendingSignupProfile | null => {
   }
 
   try {
-    return JSON.parse(value) as PendingSignupProfile;
+    const parsed: unknown = JSON.parse(value);
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    return parsed as PendingSignupProfile;
   } catch {
     return null;
   }

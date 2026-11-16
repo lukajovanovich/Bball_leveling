@@ -74,7 +74,15 @@ export default function ProfileScreen() {
   ]);
 
   const handleSave = () => {
-    updateProfile(draft);
+    // Blank text fields fall back to the saved value instead of being stored empty.
+    const nextDraft = {
+      ...draft,
+      name: draft.name.trim() || player.name,
+      mainGoal: draft.mainGoal.trim() || player.mainGoal
+    };
+
+    setDraft(nextDraft);
+    updateProfile(nextDraft);
     setSaved(true);
     setTimeout(() => setSaved(false), 1600);
   };

@@ -166,6 +166,7 @@ export const MeasurementPicker = ({
 
               <FlatList
                 ref={listRef}
+                testID="measurement-wheel"
                 contentContainerStyle={styles.optionsContent}
                 data={options}
                 decelerationRate="fast"

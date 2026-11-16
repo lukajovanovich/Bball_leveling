@@ -41,6 +41,16 @@ export const INTENSITY_CONFIG: Record<
   }
 };
 
+let idSequence = 0;
+
+// Date.now() alone repeats when two items are created in the same millisecond,
+// which would give React duplicate list keys.
+const createId = (prefix: string) => {
+  idSequence += 1;
+
+  return `${prefix}-${Date.now()}-${idSequence}`;
+};
+
 export const getWorkoutDefinition = (type: WorkoutType) => {
   const workout = WORKOUTS.find((item) => item.type === type);
 
@@ -229,16 +239,16 @@ export const applyWorkoutToProgress = (
   const completedQuests: Quest[] = [];
 
   const quests = state.quests.map((quest) => {
-    const beforeCompleted = quest.completed;
     const updatedQuest = updateQuestProgress(
       quest,
       workoutType,
       nextAttributes,
       result.attributeGains
     );
-    const justCompleted = !beforeCompleted && updatedQuest.completed;
 
-    if (justCompleted && !updatedQuest.claimed) {
+    // Also covers quests that were already complete when they were created
+    // (e.g. a rating that started above the goal) and so were never paid out.
+    if (updatedQuest.completed && !updatedQuest.claimed) {
       questXpGained += updatedQuest.rewardXp;
       completedQuests.push({ ...updatedQuest, claimed: true });
       return { ...updatedQuest, claimed: true };
@@ -260,7 +270,7 @@ export const applyWorkoutToProgress = (
 
   const completedAt = new Date().toISOString();
   const session: TrainingSession = {
-    id: `session-${Date.now()}`,
+    id: createId('session'),
     workoutType,
     intensity,
     xpGained: result.xpGained,
@@ -270,7 +280,7 @@ export const applyWorkoutToProgress = (
   };
 
   const questActivity = completedQuests.map((quest) => ({
-    id: `activity-${quest.id}-${Date.now()}`,
+    id: createId(`activity-${quest.id}`),
     type: 'quest' as const,
     title: `${quest.period === 'daily' ? 'Daily' : 'Weekly'} quest completed`,
     description: `${quest.title} paid out +${quest.rewardXp} XP.`,
@@ -282,7 +292,7 @@ export const applyWorkoutToProgress = (
     ...(levelUp
       ? [
           {
-            id: `activity-level-${Date.now()}`,
+            id: createId('activity-level'),
             type: 'level' as const,
             title: `Level ${levelUp.level} reached`,
             description: `Your build climbed from Level ${levelUp.previousLevel}.`,
@@ -293,7 +303,7 @@ export const applyWorkoutToProgress = (
       : []),
     ...questActivity,
     {
-      id: `activity-attribute-${Date.now()}`,
+      id: createId('activity-attribute'),
       type: 'attribute' as const,
       title: 'Attributes improved',
       description: describeGains(result.attributeGains),
@@ -301,7 +311,7 @@ export const applyWorkoutToProgress = (
       accentColor: workout.accentColor
     },
     {
-      id: `activity-workout-${Date.now()}`,
+      id: createId('activity-workout'),
       type: 'workout' as const,
       title: `${workout.title} completed`,
       description: `${INTENSITY_CONFIG[intensity].label} session earned +${result.xpGained} XP.`,

@@ -37,6 +37,7 @@ export const QuestCard = ({ quest }: QuestCardProps) => {
         current={quest.progress}
         target={quest.goal}
         label={isComplete ? 'Completed' : getQuestProgressLabel(quest)}
+        showValue={false}
       />
     </View>
   );
