@@ -203,7 +203,7 @@ export default function LoginScreen() {
                 </View>
 
                 <View style={styles.authHeader}>
-                  <View>
+                  <View style={styles.authHeaderCopy}>
                     <Text style={styles.authEyebrow}>
                       {mode === 'signin' ? 'Welcome back' : 'Create your access'}
                     </Text>
@@ -586,6 +586,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold
   },
   brandTextWrap: {
+    flex: 1,
+    minWidth: 0,
     gap: 2
   },
   brand: {
@@ -613,9 +615,18 @@ const styles = StyleSheet.create({
   },
   authHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.md
+  },
+  // Lets the title wrap instead of pushing the status badge off the card; on
+  // narrow phones the badge drops to its own line so the title keeps its width.
+  authHeaderCopy: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 160,
+    minWidth: 0
   },
   authEyebrow: {
     color: colors.blue,
@@ -637,7 +648,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(248,214,109,0.24)',
     backgroundColor: 'rgba(248,214,109,0.12)',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
+    paddingVertical: spacing.sm,
+    flexShrink: 0
   },
   demoBadgeText: {
     color: colors.gold,
