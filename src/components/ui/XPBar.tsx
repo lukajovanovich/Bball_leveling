@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radii, spacing } from '../../theme/theme';
+import { colors, fonts, radii, spacing } from '../../theme/theme';
 
 interface XPBarProps {
   current: number;
@@ -14,7 +14,7 @@ interface XPBarProps {
 export const XPBar = ({
   current,
   target,
-  label = 'XP Progress',
+  label = 'Progress to next level',
   color = colors.gold,
   showValue = true
 }: XPBarProps) => {
@@ -54,26 +54,28 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'baseline',
     gap: spacing.md
   },
   label: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '800'
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
   },
   value: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700'
+    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: 16,
+    fontVariant: ['tabular-nums']
   },
   track: {
-    height: 10,
-    borderRadius: radii.pill,
+    height: 6,
+    borderRadius: radii.sm,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.08)'
   },
   fill: {
     height: '100%',
-    borderRadius: radii.pill
+    borderRadius: radii.sm
   }
 });

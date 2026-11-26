@@ -14,7 +14,7 @@ import { makeSession, mockControls, supabase } from '../helpers/supabaseMock';
 
 jest.mock('../../src/lib/supabase', () => require('../helpers/supabaseMock'));
 
-const EMAIL = 'player@bballleveling.com';
+const EMAIL = 'you@example.com';
 const GOAL = 'What kind of player do you want to become?';
 
 const emailInput = () => screen.getByPlaceholderText(EMAIL);
@@ -27,7 +27,7 @@ const primaryButton = (name: string | RegExp) => {
 
 const fillSignIn = async (email = 'me@example.com', password = 'hunter22') => {
   await fireEvent.changeText(emailInput(), email);
-  await fireEvent.changeText(screen.getByPlaceholderText('Enter your password'), password);
+  await fireEvent.changeText(screen.getByPlaceholderText('Your password'), password);
 };
 
 const openSignUp = async () => {
@@ -45,9 +45,9 @@ describe('sign in', () => {
     await renderApp(<LoginScreen />);
 
     expect(screen.getByText('Sign in to your build')).toBeOnTheScreen();
-    expect(screen.getByText('Cloud ready')).toBeOnTheScreen();
+    expect(screen.queryByText(/Add your Supabase URL/)).not.toBeOnTheScreen();
     expect(emailInput()).toBeOnTheScreen();
-    expect(screen.getByPlaceholderText('Enter your password')).toBeOnTheScreen();
+    expect(screen.getByPlaceholderText('Your password')).toBeOnTheScreen();
     expect(screen.queryByText('Player setup')).not.toBeOnTheScreen();
     expect(router.replace).not.toHaveBeenCalled();
   });
@@ -55,7 +55,7 @@ describe('sign in', () => {
   it('hides the password while typing', async () => {
     await renderApp(<LoginScreen />);
 
-    expect(screen.getByPlaceholderText('Enter your password')).toHaveProp(
+    expect(screen.getByPlaceholderText('Your password')).toHaveProp(
       'secureTextEntry',
       true
     );
@@ -182,7 +182,6 @@ describe('guest mode and setup', () => {
     mockControls.setConfigured(false);
     await renderApp(<LoginScreen />);
 
-    expect(screen.getByText('Setup needed')).toBeOnTheScreen();
     expect(screen.getByText(/Add your Supabase URL and publishable key/)).toBeOnTheScreen();
   });
 
@@ -204,7 +203,7 @@ describe('sign up', () => {
   const fillSignUp = async () => {
     await fireEvent.changeText(emailInput(), 'rookie@example.com');
     await openSignUp();
-    await fireEvent.changeText(screen.getByPlaceholderText('Create a password'), 'secret1');
+    await fireEvent.changeText(screen.getByPlaceholderText('Choose a password'), 'secret1');
     await fireEvent.changeText(screen.getByPlaceholderText(GOAL), 'Become a starter');
   };
 
@@ -212,9 +211,9 @@ describe('sign up', () => {
     await renderApp(<LoginScreen />);
     await openSignUp();
 
-    expect(screen.getByText('Create account and setup your player')).toBeOnTheScreen();
+    expect(screen.getByText('Create your player')).toBeOnTheScreen();
     expect(screen.getByText('Player setup')).toBeOnTheScreen();
-    expect(screen.getByPlaceholderText('Create a password')).toBeOnTheScreen();
+    expect(screen.getByPlaceholderText('Choose a password')).toBeOnTheScreen();
     expect(screen.getByText('Height')).toBeOnTheScreen();
     expect(screen.getByText('Wingspan')).toBeOnTheScreen();
     expect(screen.getByText('Weight')).toBeOnTheScreen();
@@ -230,18 +229,18 @@ describe('sign up', () => {
     await fireEvent.changeText(emailInput(), 'jalen.novak@example.com');
     await openSignUp();
 
-    expect(screen.getByPlaceholderText('MyPlayer name')).toHaveDisplayValue('Jalen Novak');
+    expect(screen.getByPlaceholderText('Name on your jersey')).toHaveDisplayValue('Jalen Novak');
   });
 
   it('does not overwrite a name the user already typed', async () => {
     await renderApp(<LoginScreen />);
     await openSignUp();
-    await fireEvent.changeText(screen.getByPlaceholderText('MyPlayer name'), 'Custom Name');
+    await fireEvent.changeText(screen.getByPlaceholderText('Name on your jersey'), 'Custom Name');
     await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
     await fireEvent.changeText(emailInput(), 'someone.else@example.com');
     await openSignUp();
 
-    expect(screen.getByPlaceholderText('MyPlayer name')).toHaveDisplayValue('Custom Name');
+    expect(screen.getByPlaceholderText('Name on your jersey')).toHaveDisplayValue('Custom Name');
   });
 
   it('keeps the create button disabled until every required field is filled', async () => {
@@ -255,10 +254,10 @@ describe('sign up', () => {
     await fireEvent.changeText(emailInput(), 'rookie@example.com');
     expect(createButton()).toBeDisabled();
 
-    await fireEvent.changeText(screen.getByPlaceholderText('Create a password'), 'secret1');
+    await fireEvent.changeText(screen.getByPlaceholderText('Choose a password'), 'secret1');
     expect(createButton()).toBeDisabled();
 
-    await fireEvent.changeText(screen.getByPlaceholderText('MyPlayer name'), 'Rookie');
+    await fireEvent.changeText(screen.getByPlaceholderText('Name on your jersey'), 'Rookie');
     expect(createButton()).toBeDisabled();
 
     await fireEvent.changeText(screen.getByPlaceholderText(GOAL), '   ');

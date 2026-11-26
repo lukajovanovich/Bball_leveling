@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WorkoutDefinition } from '../../types';
-import { colors, radii, spacing } from '../../theme/theme';
+import { colors, fonts, radii, spacing } from '../../theme/theme';
 
 interface TrainingTypeCardProps {
   workout: WorkoutDefinition;
@@ -17,68 +17,82 @@ export const TrainingTypeCard = ({
 }: TrainingTypeCardProps) => (
   <Pressable
     accessibilityRole="button"
+    accessibilityState={{ selected }}
     onPress={onPress}
     style={({ pressed }) => [
       styles.card,
       selected && {
         borderColor: workout.accentColor,
-        backgroundColor: 'rgba(255,255,255,0.07)'
+        backgroundColor: colors.panelElevated
       },
       pressed && styles.pressed
     ]}
   >
-    <View style={[styles.iconShell, { backgroundColor: `${workout.accentColor}20` }]}>
-      <Ionicons
-        name={workout.icon as keyof typeof Ionicons.glyphMap}
-        size={22}
-        color={workout.accentColor}
-      />
-    </View>
+    <Ionicons
+      name={workout.icon as keyof typeof Ionicons.glyphMap}
+      size={22}
+      color={selected ? workout.accentColor : colors.textMuted}
+    />
     <View style={styles.copy}>
       <Text style={styles.title}>{workout.title}</Text>
       <Text style={styles.description}>{workout.description}</Text>
     </View>
-    {selected ? (
-      <Ionicons name="checkmark-circle" size={22} color={workout.accentColor} />
-    ) : null}
+    <View
+      style={[
+        styles.radio,
+        selected && { borderColor: workout.accentColor }
+      ]}
+    >
+      {selected ? (
+        <View style={[styles.radioDot, { backgroundColor: workout.accentColor }]} />
+      ) : null}
+    </View>
   </Pressable>
 );
 
 const styles = StyleSheet.create({
   card: {
-    minHeight: 92,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'transparent',
     backgroundColor: colors.panel,
-    padding: spacing.lg
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg
   },
   pressed: {
-    transform: [{ scale: 0.99 }]
-  },
-  iconShell: {
-    width: 46,
-    height: 46,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center'
+    backgroundColor: colors.panelElevated
   },
   copy: {
     flex: 1,
-    gap: 4
+    gap: 2
   },
   title: {
     color: colors.text,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 15,
-    fontWeight: '900'
+    lineHeight: 20
   },
   description: {
     color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '600'
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5
   }
 });

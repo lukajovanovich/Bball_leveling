@@ -5,6 +5,7 @@ import { WORKOUTS } from '../../src/data/workouts';
 import { TrainingTypeCard } from '../../src/components/training/TrainingTypeCard';
 import { PrimaryButton } from '../../src/components/ui/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
+import { ScreenHeader } from '../../src/components/ui/ScreenHeader';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
 import {
@@ -18,7 +19,7 @@ import {
   WorkoutIntensity,
   WorkoutType
 } from '../../src/types';
-import { colors, radii, shadows, spacing } from '../../src/theme/theme';
+import { colors, fonts, radii, spacing } from '../../src/theme/theme';
 
 const intensityOptions: WorkoutIntensity[] = ['light', 'medium', 'hard'];
 
@@ -50,26 +51,18 @@ export default function TrainScreen() {
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>Training log</Text>
-        <Text style={styles.title}>Turn today's workout into XP</Text>
-        <Text style={styles.subtitle}>
-          Pick the real session you completed, choose intensity, and your build
-          updates instantly.
-        </Text>
-      </View>
+      <ScreenHeader
+        title="Log a workout"
+        subtitle="Pick what you trained and how hard. Your ratings update right away."
+      />
 
       <View style={styles.summaryRow}>
-        <StatPill label="Current OVR" value={ovr} color={colors.gold} />
-        <StatPill label="Level" value={levelInfo.level} color={colors.green} />
+        <StatPill label="Current OVR" value={ovr} />
+        <StatPill label="Level" value={levelInfo.level} color={colors.gold} />
       </View>
 
       <View style={styles.section}>
-        <SectionHeader
-          title="Workout type"
-          subtitle="Each session targets a different part of the build."
-          color={selectedWorkout.accentColor}
-        />
+        <SectionHeader title="What did you work on?" />
         <View style={styles.stack}>
           {WORKOUTS.map((workout) => (
             <TrainingTypeCard
@@ -83,8 +76,8 @@ export default function TrainScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Intensity" color={colors.gold} />
-        <View style={styles.intensityRow}>
+        <SectionHeader title="Intensity" />
+        <View style={styles.segmented}>
           {intensityOptions.map((option) => {
             const selected = option === intensity;
             const config = INTENSITY_CONFIG[option];
@@ -93,24 +86,19 @@ export default function TrainScreen() {
               <Pressable
                 key={option}
                 accessibilityRole="button"
+                accessibilityState={{ selected }}
                 onPress={() => setIntensity(option)}
-                style={[
-                  styles.intensityButton,
-                  selected && {
-                    borderColor: selectedWorkout.accentColor,
-                    backgroundColor: `${selectedWorkout.accentColor}18`
-                  }
-                ]}
+                style={[styles.segment, selected && styles.segmentSelected]}
               >
                 <Text
                   style={[
-                    styles.intensityLabel,
-                    selected && { color: selectedWorkout.accentColor }
+                    styles.segmentLabel,
+                    selected && styles.segmentLabelSelected
                   ]}
                 >
                   {config.label}
                 </Text>
-                <Text style={styles.intensityMeta}>+{config.xp} XP</Text>
+                <Text style={styles.segmentMeta}>+{config.xp} XP</Text>
               </Pressable>
             );
           })}
@@ -118,24 +106,22 @@ export default function TrainScreen() {
       </View>
 
       <PrimaryButton
-        label={`Log ${INTENSITY_CONFIG[intensity].label} Workout`}
-        icon="add-circle"
+        label={`Log ${INTENSITY_CONFIG[intensity].label.toLowerCase()} workout`}
         onPress={handleLogWorkout}
       />
 
       {lastResult ? (
         <View style={styles.resultCard}>
           <View style={styles.resultHeader}>
-            <Text style={styles.resultKicker}>Progress gained</Text>
+            <Text style={styles.resultTitle}>Progress gained</Text>
             <Text style={styles.resultXp}>
               +{lastResult.workoutXpGained + lastResult.questXpGained} XP
             </Text>
           </View>
-          <View style={styles.resultStats}>
+          <View style={styles.summaryRow}>
             <StatPill
               label="Workout XP"
               value={`+${lastResult.workoutXpGained}`}
-              color={resultColor}
             />
             <StatPill
               label="Quest XP"
@@ -143,9 +129,9 @@ export default function TrainScreen() {
               color={colors.gold}
             />
           </View>
-          <View style={styles.gainWrap}>
+          <View style={styles.gainList}>
             {gainEntries.map(([key, gain]) => (
-              <View key={key} style={styles.gainPill}>
+              <View key={key} style={styles.gainRow}>
                 <Text style={styles.gainLabel}>{ATTRIBUTE_NAME_BY_KEY[key]}</Text>
                 <Text style={[styles.gainValue, { color: resultColor }]}>
                   +{gain}
@@ -157,9 +143,12 @@ export default function TrainScreen() {
             <View style={styles.questResult}>
               <Text style={styles.questResultTitle}>Quest completed</Text>
               {lastResult.completedQuests.map((quest) => (
-                <Text key={quest.id} style={styles.questResultText}>
-                  {quest.title} · +{quest.rewardXp} XP
-                </Text>
+                <View key={quest.id} style={styles.gainRow}>
+                  <Text style={styles.gainLabel}>{quest.title}</Text>
+                  <Text style={[styles.gainValue, styles.questXp]}>
+                    +{quest.rewardXp} XP
+                  </Text>
+                </View>
               ))}
             </View>
           ) : null}
@@ -170,135 +159,106 @@ export default function TrainScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    gap: spacing.sm
-  },
-  eyebrow: {
-    color: colors.gold,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase'
-  },
-  title: {
-    color: colors.text,
-    fontSize: 30,
-    lineHeight: 35,
-    fontWeight: '900'
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600'
-  },
   summaryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md
+    gap: spacing.lg
   },
   section: {
     gap: spacing.md
   },
   stack: {
-    gap: spacing.md
-  },
-  intensityRow: {
-    flexDirection: 'row',
     gap: spacing.sm
   },
-  intensityButton: {
-    flex: 1,
-    minHeight: 72,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+  segmented: {
+    flexDirection: 'row',
+    borderRadius: radii.lg,
     backgroundColor: colors.panel,
+    padding: spacing.xs,
+    gap: spacing.xs
+  },
+  segment: {
+    flex: 1,
+    minHeight: 60,
+    borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm
+    gap: 2
   },
-  intensityLabel: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '900'
+  segmentSelected: {
+    backgroundColor: colors.panelHighlight
   },
-  intensityMeta: {
+  segmentLabel: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800'
+    fontFamily: fonts.display,
+    fontSize: 20
+  },
+  segmentLabelSelected: {
+    color: colors.text
+  },
+  segmentMeta: {
+    color: colors.textSubtle,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12
   },
   resultCard: {
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    backgroundColor: colors.panelElevated,
+    backgroundColor: colors.panel,
     padding: spacing.xl,
-    gap: spacing.lg,
-    ...shadows.card
+    gap: spacing.lg
   },
   resultHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: spacing.lg
   },
-  resultKicker: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase'
+  resultTitle: {
+    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: 22
   },
   resultXp: {
     color: colors.gold,
-    fontSize: 28,
-    fontWeight: '900'
+    fontFamily: fonts.displayBold,
+    fontSize: 36,
+    lineHeight: 40
   },
-  resultStats: {
+  gainList: {
+    gap: spacing.xs
+  },
+  gainRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     gap: spacing.md
   },
-  gainWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm
-  },
-  gainPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md
-  },
   gainLabel: {
+    flex: 1,
     color: colors.text,
-    fontSize: 12,
-    fontWeight: '800'
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20
   },
   gainValue: {
-    fontSize: 12,
-    fontWeight: '900'
+    fontFamily: fonts.displayBold,
+    fontSize: 18
+  },
+  questXp: {
+    color: colors.gold
   },
   questResult: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     gap: spacing.xs
   },
   questResultTitle: {
     color: colors.gold,
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase'
-  },
-  questResultText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '700'
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    marginBottom: spacing.xs
   }
 });

@@ -84,9 +84,9 @@ describe('attribute categories', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('titles end with " attributes" because Home strips that suffix', () => {
+  it('uses short titles that fit a stat cell on Home', () => {
     ATTRIBUTE_CATEGORIES.forEach((category) => {
-      expect(category.title.endsWith(' attributes')).toBe(true);
+      expect(category.title).toMatch(/^[A-Z][a-z]+$/);
     });
   });
 

@@ -13,11 +13,13 @@
     "test": "jest"
   },
   "dependencies": {
+    "@expo-google-fonts/barlow": "^0.4.1",
+    "@expo-google-fonts/barlow-condensed": "^0.4.1",
     "@expo/metro-runtime": "^55.0.10",
     "@expo/vector-icons": "latest",
     "@supabase/supabase-js": "^2.104.1",
     "expo": "latest",
-    "expo-linear-gradient": "latest",
+    "expo-font": "~55.0.6",
     "expo-router": "latest",
     "expo-sqlite": "~55.0.15",
     "expo-status-bar": "latest",

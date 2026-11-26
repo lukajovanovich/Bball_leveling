@@ -14,7 +14,7 @@ import {
   MeasurementOption,
   findClosestMeasurementIndex
 } from '../../lib/measurements';
-import { colors, radii, shadows, spacing } from '../../theme/theme';
+import { colors, fonts, radii, spacing } from '../../theme/theme';
 
 interface MeasurementPickerProps {
   label: string;
@@ -82,6 +82,7 @@ export const MeasurementPicker = ({
       <Pressable
         accessibilityRole="button"
         onPress={() => setIsOpen(true)}
+        accessibilityLabel={`${label}: ${valueLabel}. Tap to edit`}
         style={({ pressed }) => [
           styles.trigger,
           pressed && styles.triggerPressed
@@ -257,14 +258,14 @@ const styles = StyleSheet.create({
     gap: 2
   },
   triggerLabel: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '900'
+    color: colors.textMuted,
+    fontSize: 14,
+    fontFamily: fonts.bodyMedium
   },
   triggerHint: {
     color: colors.textSubtle,
     fontSize: 12,
-    fontWeight: '700'
+    fontFamily: fonts.body
   },
   triggerValueWrap: {
     flexDirection: 'row',
@@ -272,9 +273,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   triggerValue: {
-    color: colors.gold,
-    fontSize: 15,
-    fontWeight: '900'
+    color: colors.text,
+    fontSize: 22,
+    fontFamily: fonts.display
   },
   overlay: {
     flex: 1,
@@ -292,7 +293,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.panelElevated,
     padding: spacing.lg,
     gap: spacing.md,
-    ...shadows.card
   },
   modalHeader: {
     flexDirection: 'row',
@@ -306,21 +306,21 @@ const styles = StyleSheet.create({
   },
   modalLabel: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: '900'
+    fontSize: 24,
+    fontFamily: fonts.display
   },
   modalHelperText: {
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 19,
-    fontWeight: '600'
+    fontFamily: fonts.body
   },
   doneButton: {
     minHeight: 34,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(248,214,109,0.24)',
-    backgroundColor: 'rgba(248,214,109,0.12)',
+    borderColor: 'rgba(224,123,57,0.4)',
+    backgroundColor: 'rgba(224,123,57,0.12)',
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center'
@@ -329,10 +329,9 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }]
   },
   doneButtonText: {
-    color: colors.gold,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase'
+    color: colors.court,
+    fontSize: 14,
+    fontFamily: fonts.bodySemiBold
   },
   unitSwitch: {
     flexDirection: 'row',
@@ -354,8 +353,8 @@ const styles = StyleSheet.create({
   },
   unitButtonText: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900'
+    fontSize: 14,
+    fontFamily: fonts.bodySemiBold
   },
   unitButtonTextSelected: {
     color: colors.text
@@ -364,9 +363,9 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   selectedValueLabel: {
-    color: colors.gold,
-    fontSize: 19,
-    fontWeight: '900'
+    color: colors.text,
+    fontSize: 28,
+    fontFamily: fonts.displayBold
   },
   wheelShell: {
     height: WHEEL_HEIGHT,
@@ -380,8 +379,8 @@ const styles = StyleSheet.create({
     height: OPTION_HEIGHT,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: 'rgba(248,214,109,0.2)',
-    backgroundColor: 'rgba(248,214,109,0.08)'
+    borderColor: 'rgba(224,123,57,0.35)',
+    backgroundColor: 'rgba(224,123,57,0.08)'
   },
   wheelList: {
     flexGrow: 0
@@ -400,18 +399,18 @@ const styles = StyleSheet.create({
   },
   optionLabel: {
     color: colors.textMuted,
-    fontSize: 18,
-    fontWeight: '800'
+    fontSize: 20,
+    fontFamily: fonts.display
   },
   optionLabelSelected: {
-    color: colors.gold,
-    fontSize: 22,
-    fontWeight: '900'
+    color: colors.text,
+    fontSize: 26,
+    fontFamily: fonts.displayBold
   },
   optionSecondaryLabel: {
     color: colors.textSubtle,
     fontSize: 12,
-    fontWeight: '700'
+    fontFamily: fonts.body
   },
   optionSecondaryLabelSelected: {
     color: colors.textMuted

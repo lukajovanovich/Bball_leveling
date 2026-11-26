@@ -103,7 +103,8 @@ describe('OVRCard', () => {
     );
 
     expect(screen.getByText('Jalen Novak')).toBeOnTheScreen();
-    expect(screen.getByText('Shooting Guard · Shot-Creating Guard')).toBeOnTheScreen();
+    expect(screen.getByText('Shooting Guard')).toBeOnTheScreen();
+    expect(screen.getByText('Shot-Creating Guard')).toBeOnTheScreen();
     expect(screen.getByText('63')).toBeOnTheScreen();
     expect(screen.getByText('3')).toBeOnTheScreen();
   });
@@ -124,7 +125,7 @@ describe('QuestCard', () => {
 
     expect(screen.getByText('Complete 2 Finishing Workouts')).toBeOnTheScreen();
     expect(screen.getByText('Stack rim pressure reps across the week.')).toBeOnTheScreen();
-    expect(screen.getByText('+220')).toBeOnTheScreen();
+    expect(screen.getByText('+220 XP')).toBeOnTheScreen();
     expect(screen.getByText('1 / 2')).toBeOnTheScreen();
     expect(screen.queryByText('Completed')).not.toBeOnTheScreen();
     expect(widthOf('xp-bar-fill')).toBe('50%');

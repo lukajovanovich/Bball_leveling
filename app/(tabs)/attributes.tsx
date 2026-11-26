@@ -3,25 +3,20 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ATTRIBUTE_CATEGORIES } from '../../src/data/attributes';
 import { AttributeCategoryCard } from '../../src/components/player/AttributeCategoryCard';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
-import { SectionHeader } from '../../src/components/ui/SectionHeader';
-import { StatPill } from '../../src/components/ui/StatPill';
+import { ScreenHeader } from '../../src/components/ui/ScreenHeader';
 import { XPBar } from '../../src/components/ui/XPBar';
 import { useProgress } from '../../src/store/ProgressContext';
-import { colors, radii, spacing } from '../../src/theme/theme';
+import { colors, fonts, radii, spacing } from '../../src/theme/theme';
 
 export default function AttributesScreen() {
   const { player, ovr, levelInfo } = useProgress();
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>Progress dashboard</Text>
-        <Text style={styles.title}>Player build attributes</Text>
-        <Text style={styles.subtitle}>
-          Every attribute moves between 0 and 99. New builds start from zero,
-          and your OVR is recalculated after each workout.
-        </Text>
-      </View>
+      <ScreenHeader
+        title="Your build"
+        subtitle="Ratings run from 0 to 99. Every workout moves them, and your OVR follows."
+      />
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryTop}>
@@ -29,23 +24,14 @@ export default function AttributesScreen() {
             <Text style={styles.summaryLabel}>Current OVR</Text>
             <Text style={styles.ovr}>{ovr}</Text>
           </View>
-          <View style={styles.levelBox}>
-            <Text style={styles.levelLabel}>Level</Text>
+          <View style={styles.summaryMeta}>
+            <Text style={styles.summaryLabel}>Level</Text>
             <Text style={styles.levelValue}>{levelInfo.level}</Text>
           </View>
         </View>
+        <Text style={styles.archetype}>{player.archetype}</Text>
         <XPBar current={levelInfo.currentXp} target={levelInfo.xpForNext} />
-        <View style={styles.statGrid}>
-          <StatPill label="Archetype" value={player.archetype} color={colors.gold} />
-          <StatPill label="Goal" value="OVR climb" color={colors.green} />
-        </View>
       </View>
-
-      <SectionHeader
-        title="Full attribute map"
-        subtitle="Category colors match the progression focus for each skill group."
-        color={colors.blue}
-      />
 
       {ATTRIBUTE_CATEGORIES.map((category) => (
         <AttributeCategoryCard
@@ -59,77 +45,43 @@ export default function AttributesScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    gap: spacing.sm
-  },
-  eyebrow: {
-    color: colors.gold,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase'
-  },
-  title: {
-    color: colors.text,
-    fontSize: 30,
-    lineHeight: 35,
-    fontWeight: '900'
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600'
-  },
   summaryCard: {
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    backgroundColor: colors.panelElevated,
+    backgroundColor: colors.panel,
     padding: spacing.xl,
-    gap: spacing.lg
+    gap: spacing.md
   },
   summaryTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     gap: spacing.lg
   },
   summaryLabel: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase'
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
   },
   ovr: {
     color: colors.text,
-    fontSize: 54,
-    lineHeight: 58,
-    fontWeight: '900'
+    fontFamily: fonts.displayBold,
+    fontSize: 72,
+    lineHeight: 76
   },
-  levelBox: {
-    width: 78,
-    height: 78,
-    borderRadius: radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(248,214,109,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(248,214,109,0.28)'
-  },
-  levelLabel: {
-    color: colors.gold,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase'
+  summaryMeta: {
+    alignItems: 'flex-end'
   },
   levelValue: {
-    color: colors.text,
-    fontSize: 30,
-    fontWeight: '900'
+    color: colors.gold,
+    fontFamily: fonts.displayBold,
+    fontSize: 40,
+    lineHeight: 44
   },
-  statGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md
+  archetype: {
+    color: colors.text,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15
   }
 });

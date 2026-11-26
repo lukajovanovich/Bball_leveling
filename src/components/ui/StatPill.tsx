@@ -1,55 +1,42 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radii, spacing } from '../../theme/theme';
+import { colors, fonts, spacing } from '../../theme/theme';
 
 interface StatPillProps {
   label: string;
   value: string | number;
+  /** Tints the value; leave unset for plain white numbers. */
   color?: string;
 }
 
-export const StatPill = ({ label, value, color = colors.gold }: StatPillProps) => (
+// A box-score cell: small label over a condensed number, separated from its
+// neighbours by a hairline instead of sitting in its own card.
+export const StatPill = ({ label, value, color = colors.text }: StatPillProps) => (
   <View style={styles.container}>
-    <View style={[styles.dot, { backgroundColor: color }]} />
-    <View style={styles.copy}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
-    </View>
+    <Text style={styles.label}>{label}</Text>
+    <Text style={[styles.value, { color }]} numberOfLines={1}>
+      {value}
+    </Text>
   </View>
 );
 
 const styles = StyleSheet.create({
   container: {
-    minHeight: 58,
     flex: 1,
-    minWidth: 136,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.panel,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  dot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5
-  },
-  copy: {
-    flex: 1,
+    minWidth: 96,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderStrong,
+    paddingTop: spacing.sm,
     gap: 2
   },
   label: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase'
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
   },
   value: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '900'
+    fontFamily: fonts.display,
+    fontSize: 24,
+    lineHeight: 28
   }
 });

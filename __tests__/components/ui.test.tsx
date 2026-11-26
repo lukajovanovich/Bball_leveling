@@ -14,9 +14,9 @@ const fillWidth = (testID: string) =>
 describe('PrimaryButton', () => {
   it('shows its label and reacts to a press', async () => {
     const onPress = jest.fn();
-    await render(<PrimaryButton label="Train Now" onPress={onPress} />);
+    await render(<PrimaryButton label="Log a workout" onPress={onPress} />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Train Now' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log a workout' }));
 
     expect(onPress).toHaveBeenCalledTimes(1);
   });
@@ -47,7 +47,7 @@ describe('XPBar', () => {
   it('shows rounded current and target XP with the default label', async () => {
     await render(<XPBar current={120.4} target={250} />);
 
-    expect(screen.getByText('XP Progress')).toBeOnTheScreen();
+    expect(screen.getByText('Progress to next level')).toBeOnTheScreen();
     expect(screen.getByText('120 / 250 XP')).toBeOnTheScreen();
   });
 

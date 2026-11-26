@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { QuestCard } from '../../src/components/player/QuestCard';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
+import { ScreenHeader } from '../../src/components/ui/ScreenHeader';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
 import { useProgress } from '../../src/store/ProgressContext';
@@ -19,26 +20,18 @@ export default function QuestsScreen() {
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>Quest board</Text>
-        <Text style={styles.title}>Stack XP with focused goals</Text>
-        <Text style={styles.subtitle}>
-          Quests reward useful behavior: completing workouts, improving key
-          ratings, and pushing your build toward the next tier.
-        </Text>
-      </View>
+      <ScreenHeader
+        title="Quests"
+        subtitle="Finish workouts and raise key ratings to earn bonus XP."
+      />
 
       <View style={styles.summaryRow}>
-        <StatPill label="Completed" value={`${completed}/${state.quests.length}`} color={colors.success} />
-        <StatPill label="Available XP" value={availableXp} color={colors.gold} />
+        <StatPill label="Completed" value={`${completed}/${state.quests.length}`} />
+        <StatPill label="XP left to earn" value={availableXp} color={colors.gold} />
       </View>
 
       <View style={styles.section}>
-        <SectionHeader
-          title="Daily quests"
-          subtitle="Short-term XP targets for today's training."
-          color={colors.gold}
-        />
+        <SectionHeader title="Daily" />
         <View style={styles.stack}>
           {daily.map((quest) => (
             <QuestCard key={quest.id} quest={quest} />
@@ -47,11 +40,7 @@ export default function QuestsScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader
-          title="Weekly quests"
-          subtitle="Bigger build goals that take a few sessions."
-          color={colors.purple}
-        />
+        <SectionHeader title="Weekly" subtitle="Bigger goals that take a few sessions." />
         <View style={styles.stack}>
           {weekly.map((quest) => (
             <QuestCard key={quest.id} quest={quest} />
@@ -63,36 +52,15 @@ export default function QuestsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    gap: spacing.sm
-  },
-  eyebrow: {
-    color: colors.gold,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase'
-  },
-  title: {
-    color: colors.text,
-    fontSize: 30,
-    lineHeight: 35,
-    fontWeight: '900'
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600'
-  },
   summaryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md
+    gap: spacing.lg
   },
   section: {
     gap: spacing.md
   },
   stack: {
-    gap: spacing.md
+    gap: spacing.sm
   }
 });

@@ -6,9 +6,8 @@ import {
   Text,
   ViewStyle
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radii, spacing } from '../../theme/theme';
+import { colors, fonts, radii, spacing } from '../../theme/theme';
 
 interface PrimaryButtonProps {
   label: string;
@@ -31,37 +30,28 @@ export const PrimaryButton = ({
     disabled={disabled}
     onPress={onPress}
     style={({ pressed }) => [
-      styles.pressable,
+      styles.button,
       disabled && styles.disabled,
       pressed && !disabled && styles.pressed,
       style
     ]}
   >
-    <LinearGradient
-      colors={[colors.gold, colors.court]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.gradient}
-    >
-      {icon ? (
-        <Ionicons
-          name={icon as keyof typeof Ionicons.glyphMap}
-          size={20}
-          color={colors.black}
-        />
-      ) : null}
-      <Text style={styles.label}>{label}</Text>
-    </LinearGradient>
+    {icon ? (
+      <Ionicons
+        name={icon as keyof typeof Ionicons.glyphMap}
+        size={18}
+        color={colors.black}
+      />
+    ) : null}
+    <Text style={styles.label}>{label}</Text>
   </Pressable>
 );
 
 const styles = StyleSheet.create({
-  pressable: {
+  button: {
+    minHeight: 52,
     borderRadius: radii.md,
-    overflow: 'hidden'
-  },
-  gradient: {
-    minHeight: 54,
+    backgroundColor: colors.court,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -70,13 +60,14 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.black,
-    fontSize: 16,
-    fontWeight: '900'
+    fontFamily: fonts.displayBold,
+    fontSize: 19,
+    letterSpacing: 0.3
   },
   disabled: {
-    opacity: 0.45
+    opacity: 0.4
   },
   pressed: {
-    transform: [{ scale: 0.98 }]
+    backgroundColor: '#C96A2D'
   }
 });

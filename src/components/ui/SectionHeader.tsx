@@ -1,50 +1,35 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '../../theme/theme';
+import { colors, fonts } from '../../theme/theme';
 
 interface SectionHeaderProps {
   title: string;
   subtitle?: string;
-  color?: string;
 }
 
-export const SectionHeader = ({
-  title,
-  subtitle,
-  color = colors.gold
-}: SectionHeaderProps) => (
+export const SectionHeader = ({ title, subtitle }: SectionHeaderProps) => (
   <View style={styles.container}>
-    <View style={[styles.marker, { backgroundColor: color }]} />
-    <View style={styles.copy}>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-    </View>
+    <Text accessibilityRole="header" style={styles.title}>
+      {title}
+    </Text>
+    {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
   </View>
 );
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md
-  },
-  marker: {
-    width: 4,
-    height: 28,
-    borderRadius: 2
-  },
-  copy: {
-    flex: 1,
     gap: 2
   },
   title: {
     color: colors.text,
-    fontSize: 18,
-    fontWeight: '900'
+    fontFamily: fonts.display,
+    fontSize: 24,
+    lineHeight: 28
   },
   subtitle: {
     color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20
   }
 });

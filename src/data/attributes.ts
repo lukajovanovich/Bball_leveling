@@ -4,7 +4,7 @@ import { colors } from '../theme/theme';
 export const ATTRIBUTE_CATEGORIES: AttributeCategory[] = [
   {
     id: 'finishing',
-    title: 'Finishing attributes',
+    title: 'Finishing',
     color: colors.blue,
     attributes: [
       { key: 'closeShot', name: 'Close Shot' },
@@ -16,7 +16,7 @@ export const ATTRIBUTE_CATEGORIES: AttributeCategory[] = [
   },
   {
     id: 'shooting',
-    title: 'Shooting attributes',
+    title: 'Shooting',
     color: colors.green,
     attributes: [
       { key: 'midRangeShot', name: 'Mid-Range Shot' },
@@ -26,7 +26,7 @@ export const ATTRIBUTE_CATEGORIES: AttributeCategory[] = [
   },
   {
     id: 'playmaking',
-    title: 'Playmaking attributes',
+    title: 'Playmaking',
     color: colors.orange,
     attributes: [
       { key: 'passAccuracy', name: 'Pass Accuracy' },
@@ -36,7 +36,7 @@ export const ATTRIBUTE_CATEGORIES: AttributeCategory[] = [
   },
   {
     id: 'defense',
-    title: 'Defense attributes',
+    title: 'Defense',
     color: colors.red,
     attributes: [
       { key: 'interiorDefense', name: 'Interior Defense' },
@@ -47,7 +47,7 @@ export const ATTRIBUTE_CATEGORIES: AttributeCategory[] = [
   },
   {
     id: 'rebounding',
-    title: 'Rebounding attributes',
+    title: 'Rebounding',
     color: colors.purple,
     attributes: [
       { key: 'offensiveRebound', name: 'Offensive Rebound' },
@@ -56,7 +56,7 @@ export const ATTRIBUTE_CATEGORIES: AttributeCategory[] = [
   },
   {
     id: 'physical',
-    title: 'Physical attributes',
+    title: 'Physical',
     color: colors.yellow,
     attributes: [
       { key: 'speed', name: 'Speed' },

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../../lib/progression';
-import { colors, radii, spacing } from '../../theme/theme';
+import { colors, fonts, radii, spacing } from '../../theme/theme';
 
 interface AttributeBarProps {
   name: string;
@@ -19,7 +19,7 @@ export const AttributeBar = ({ name, value, color }: AttributeBarProps) => {
     <View style={styles.container}>
       <View style={styles.row}>
         <Text style={styles.name}>{name}</Text>
-        <Text style={[styles.value, { color }]}>{value}</Text>
+        <Text style={styles.value}>{value}</Text>
       </View>
       <View style={styles.track}>
         <View
@@ -39,34 +39,37 @@ export const AttributeBar = ({ name, value, color }: AttributeBarProps) => {
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.sm
+    gap: 6
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: spacing.md
   },
   name: {
     flex: 1,
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '800'
+    fontFamily: fonts.body,
+    fontSize: 14
   },
   value: {
-    width: 34,
+    minWidth: 30,
     textAlign: 'right',
-    fontSize: 15,
-    fontWeight: '900'
+    color: colors.text,
+    fontFamily: fonts.displayBold,
+    fontSize: 20,
+    lineHeight: 22,
+    fontVariant: ['tabular-nums']
   },
   track: {
-    height: 9,
-    borderRadius: radii.pill,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    height: 4,
+    borderRadius: radii.sm,
+    backgroundColor: 'rgba(255,255,255,0.07)',
     overflow: 'hidden'
   },
   fill: {
     height: '100%',
-    borderRadius: radii.pill
+    borderRadius: radii.sm
   }
 });

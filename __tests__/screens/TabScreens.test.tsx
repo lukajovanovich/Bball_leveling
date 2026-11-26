@@ -44,7 +44,8 @@ describe('Home screen', () => {
     await renderApp(<HomeScreen />);
 
     expect(screen.getByText('Jalen Novak')).toBeOnTheScreen();
-    expect(screen.getByText('Shooting Guard · Shot-Creating Guard')).toBeOnTheScreen();
+    expect(screen.getByText('Shooting Guard')).toBeOnTheScreen();
+    expect(screen.getAllByText('Shot-Creating Guard').length).toBeGreaterThan(0);
     expect(screen.getByText('Level 3 progress')).toBeOnTheScreen();
     expect(screen.getByText('270 / 390 XP')).toBeOnTheScreen();
     expect(readProbe()).toMatchObject({ ovr: 63, level: 3 });
@@ -91,7 +92,7 @@ describe('Home screen', () => {
   it('opens the Train tab from the Train Now button', async () => {
     await renderApp(<HomeScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Train Now' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log a workout' }));
 
     expect(router.push).toHaveBeenCalledWith('/train');
   });
@@ -115,8 +116,8 @@ describe('Home screen', () => {
       </>
     );
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
 
     // newest first: the two fresh workouts push the seeded entries out
     expect(screen.getAllByText('Shooting Workout completed').length).toBeGreaterThan(0);
@@ -158,7 +159,7 @@ describe('Build (attributes) screen', () => {
 
     await fireEvent.press(screen.getByText('Rebounding Workout'));
     await fireEvent.press(screen.getByText('Hard'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Hard Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log hard workout' }));
 
     // 190 workout XP + 80 quest XP crosses the 250 XP needed for level 2
     expect(readProbe()).toMatchObject({ level: 2, totalXp: 270 });
@@ -177,7 +178,7 @@ describe('Train screen', () => {
     expect(screen.getByText('+70 XP')).toBeOnTheScreen();
     expect(screen.getByText('+120 XP')).toBeOnTheScreen();
     expect(screen.getByText('+190 XP')).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Log Medium Workout' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Log medium workout' })).toBeOnTheScreen();
     expect(screen.queryByText('Progress gained')).not.toBeOnTheScreen();
   });
 
@@ -185,16 +186,16 @@ describe('Train screen', () => {
     await renderApp(<TrainScreen />);
 
     await fireEvent.press(screen.getByText('Light'));
-    expect(screen.getByRole('button', { name: 'Log Light Workout' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Log light workout' })).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByText('Hard'));
-    expect(screen.getByRole('button', { name: 'Log Hard Workout' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Log hard workout' })).toBeOnTheScreen();
   });
 
   it('logs the default workout and shows what was gained', async () => {
     await renderApp(<TrainScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
 
     expect(screen.getByText('Progress gained')).toBeOnTheScreen();
     // 120 workout + 80 ("Complete 1 workout") + 90 ("Improve Three-Point Shot")
@@ -206,8 +207,10 @@ describe('Train screen', () => {
     expect(screen.getByText('Free Throw')).toBeOnTheScreen();
     expect(screen.getByText('Close Shot')).toBeOnTheScreen();
     expect(screen.getByText('Quest completed')).toBeOnTheScreen();
-    expect(screen.getByText('Complete 1 workout · +80 XP')).toBeOnTheScreen();
-    expect(screen.getByText('Improve Three-Point Shot · +90 XP')).toBeOnTheScreen();
+    expect(screen.getByText('Complete 1 workout')).toBeOnTheScreen();
+    expect(screen.getByText('+80 XP')).toBeOnTheScreen();
+    expect(screen.getByText('Improve Three-Point Shot')).toBeOnTheScreen();
+    expect(screen.getByText('+90 XP')).toBeOnTheScreen();
     expect(readProbe()).toMatchObject({ totalXp: 840 + 290, sessions: 1 });
   });
 
@@ -216,19 +219,20 @@ describe('Train screen', () => {
 
     await fireEvent.press(screen.getByText('Defense Workout'));
     await fireEvent.press(screen.getByText('Hard'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Hard Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log hard workout' }));
 
     expect(screen.getByText('Perimeter Defense')).toBeOnTheScreen();
     expect(screen.getByText('Interior Defense')).toBeOnTheScreen();
     expect(screen.getByText('Steal')).toBeOnTheScreen();
     expect(screen.getByText('Block')).toBeOnTheScreen();
-    expect(screen.getByText('Complete 1 Defense Workout · +100 XP')).toBeOnTheScreen();
+    expect(screen.getByText('Complete 1 Defense Workout')).toBeOnTheScreen();
+    expect(screen.getByText('+100 XP')).toBeOnTheScreen();
     expect(screen.queryByText('Mid-Range Shot')).not.toBeOnTheScreen();
   });
 
   it('pays quest XP only once across repeated workouts', async () => {
     await renderApp(<TrainScreen />);
-    const logButton = () => screen.getByRole('button', { name: 'Log Medium Workout' });
+    const logButton = () => screen.getByRole('button', { name: 'Log medium workout' });
 
     await fireEvent.press(logButton());
     await fireEvent.press(logButton());
@@ -244,7 +248,7 @@ describe('Train screen', () => {
   it('keeps the result card in the logged workout color after selecting another', async () => {
     await renderApp(<TrainScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
     await fireEvent.press(screen.getByText('Defense Workout'));
 
     // Mid-Range and Three-Point both gained +2 from the shooting workout
@@ -257,7 +261,7 @@ describe('Train screen', () => {
     signInWith(newPlayerState());
     await renderApp(<TrainScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
 
     await waitFor(() => expect(mockControls.upsert).toHaveBeenCalledTimes(1));
     expect(lastSavedPlayer().totalXp).toBe(readProbe().totalXp);
@@ -272,18 +276,18 @@ describe('Train screen', () => {
       </>
     );
 
-    expect(screen.queryByText('Level Up')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Level up')).not.toBeOnTheScreen();
 
     // 840 + 290 = 1130 XP takes the sample player from level 3 to 4
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
 
-    expect(screen.getByText('Level Up')).toBeOnTheScreen();
-    expect(screen.getByText('Level 4')).toBeOnTheScreen();
-    expect(screen.getByText(/jumped from Level\s+3/)).toBeOnTheScreen();
+    expect(screen.getByText('Level up')).toBeOnTheScreen();
+    expect(screen.getByTestId('level-up-level')).toHaveTextContent('4');
+    expect(screen.getByText(/Up from level\s+3/)).toBeOnTheScreen();
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Keep Grinding' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Keep training' }));
 
-    expect(screen.queryByText('Level Up')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Level up')).not.toBeOnTheScreen();
     expect(readProbe().level).toBe(4);
   });
 
@@ -295,12 +299,12 @@ describe('Train screen', () => {
       </>
     );
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Keep Grinding' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Keep training' }));
     await fireEvent.press(screen.getByText('Light'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Light Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log light workout' }));
 
-    expect(screen.queryByText('Level Up')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Level up')).not.toBeOnTheScreen();
   });
 });
 
@@ -308,8 +312,8 @@ describe('Quests screen', () => {
   it('lists daily and weekly quests with totals', async () => {
     await renderApp(<QuestsScreen />);
 
-    expect(screen.getByText('Daily quests')).toBeOnTheScreen();
-    expect(screen.getByText('Weekly quests')).toBeOnTheScreen();
+    expect(screen.getByText('Daily')).toBeOnTheScreen();
+    expect(screen.getByText('Weekly')).toBeOnTheScreen();
     [
       'Complete 1 workout',
       'Complete 1 Defense Workout',
@@ -335,7 +339,7 @@ describe('Quests screen', () => {
     );
 
     await fireEvent.press(screen.getByText('Defense Workout'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
 
     expect(screen.getByText('2/6')).toBeOnTheScreen();
     expect(screen.getAllByText('Completed').length).toBeGreaterThanOrEqual(2);
@@ -353,7 +357,7 @@ describe('Quests screen', () => {
     );
 
     await fireEvent.press(screen.getByText('Finishing Workout'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Log Medium Workout' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
 
     expect(screen.getByText('1 / 2')).toBeOnTheScreen();
   });
@@ -375,7 +379,7 @@ describe('Profile screen', () => {
     await renderApp(<ProfileScreen />);
 
     expect(screen.getByText('Guest')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Sign Out' })).not.toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeOnTheScreen();
   });
 
   it('saves edited details', async () => {
@@ -388,7 +392,7 @@ describe('Profile screen', () => {
     );
     await fireEvent.press(screen.getByRole('button', { name: 'Center' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Stretch Big' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
 
     expect(screen.getByRole('button', { name: 'Saved' })).toBeOnTheScreen();
     expect(readProbe()).toMatchObject({
@@ -416,7 +420,7 @@ describe('Profile screen', () => {
     await renderApp(<ProfileScreen />);
 
     await fireEvent.changeText(screen.getByPlaceholderText('Player name'), '   ');
-    await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
 
     expect(readProbe().name).toBe('Jalen Novak');
     expect(screen.getByPlaceholderText('Player name')).toHaveDisplayValue('Jalen Novak');
@@ -426,7 +430,7 @@ describe('Profile screen', () => {
     await renderApp(<ProfileScreen />);
 
     await fireEvent.changeText(screen.getByPlaceholderText('Player name'), '  Spacey  ');
-    await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
 
     expect(readProbe().name).toBe('Spacey');
   });
@@ -436,7 +440,7 @@ describe('Profile screen', () => {
 
     await fireEvent.press(screen.getAllByText('Tap to edit')[0]);
     await fireEvent.press(screen.getByText('5\'10"'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
 
     expect(readProbe()).toMatchObject({ heightCm: 177.8, heightUnit: 'in' });
   });
@@ -447,7 +451,7 @@ describe('Profile screen', () => {
     await fireEvent.press(screen.getAllByText('Tap to edit')[2]);
     await fireEvent.press(screen.getByText('kg'));
     await fireEvent.press(screen.getByText('Done'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
 
     expect(readProbe()).toMatchObject({ weightKg: 88.45, weightUnit: 'kg' });
     expect(screen.getByText('88 kg')).toBeOnTheScreen();
@@ -459,7 +463,7 @@ describe('Profile screen', () => {
     await fireEvent.press(screen.getAllByText('Tap to edit')[1]);
     await fireEvent.press(screen.getByText('cm'));
     await fireEvent.press(screen.getByText('165 cm'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
 
     expect(readProbe()).toMatchObject({ wingspanCm: 165, wingspanUnit: 'cm' });
   });
@@ -469,7 +473,7 @@ describe('Profile screen', () => {
 
     await fireEvent.press(screen.getAllByText('Tap to edit')[2]);
     await fireEvent.press(screen.getByText('125 lb'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
 
     expect(readProbe()).toMatchObject({ weightKg: 56.7, weightUnit: 'lb' });
     expect(screen.getByText('125 lb')).toBeOnTheScreen();
@@ -480,14 +484,14 @@ describe('Profile screen', () => {
     jest.useFakeTimers();
 
     try {
-      await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+      await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
       expect(screen.getByRole('button', { name: 'Saved' })).toBeOnTheScreen();
 
       await act(async () => {
         jest.advanceTimersByTime(1700);
       });
 
-      expect(screen.getByRole('button', { name: 'Save Profile' })).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Save profile' })).toBeOnTheScreen();
     } finally {
       jest.useRealTimers();
     }
@@ -500,7 +504,7 @@ describe('Profile screen', () => {
     expect(screen.getByText('Connected')).toBeOnTheScreen();
 
     await fireEvent.changeText(screen.getByPlaceholderText('Player name'), 'Cloud Name');
-    await fireEvent.press(screen.getByRole('button', { name: 'Save Profile' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
 
     await waitFor(() => expect(mockControls.upsert).toHaveBeenCalledTimes(1));
     expect(lastSavedPlayer()).toMatchObject({ name: 'Cloud Name', totalXp: 500 });
@@ -511,7 +515,7 @@ describe('Profile screen', () => {
     signInWith();
     await renderApp(<ProfileScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Sign Out' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/'));
     expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
@@ -522,10 +526,10 @@ describe('Profile screen', () => {
     supabase.auth.signOut.mockResolvedValue({ error: { message: 'Failed to fetch' } });
     await renderApp(<ProfileScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Sign Out' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Sign Out' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled()
     );
     expect(router.replace).not.toHaveBeenCalled();
   });
@@ -549,7 +553,7 @@ describe('Profile screen', () => {
     ['Training reminders', 'Season goals', 'Coach sharing'].forEach((setting) => {
       expect(screen.getByText(setting)).toBeOnTheScreen();
     });
-    expect(screen.getAllByText('Soon')).toHaveLength(3);
+    expect(screen.getAllByText('Coming soon')).toHaveLength(3);
   });
 });
 
@@ -596,6 +600,6 @@ describe('navigation shells', () => {
     await render(<RootLayout />);
 
     expect(await screen.findByTestId('stack')).toBeOnTheScreen();
-    expect(screen.queryByText('Level Up')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Level up')).not.toBeOnTheScreen();
   });
 });

@@ -40,7 +40,7 @@ Run `npm run typecheck` and `npm test` before every commit. There is no linter c
 - `src/lib/` — pure logic: `progression.ts` (XP, levels, OVR, workout → attribute gains, quest progress), `measurements.ts` (cm/in, kg/lb conversion and picker options), `playerProfileStore.ts` (Supabase read/upsert), `supabase.ts` (client), `pendingSignup.ts`, `playerIdentity.ts`.
 - `src/data/` — static definitions: attribute categories, workouts, quests, positions/archetypes, plus player/state factories and normalizers in `mockPlayer.ts`.
 - `src/components/` — `ui/` (generic), `player/`, `training/`.
-- `src/theme/theme.ts` — `colors`, `spacing`, `radii`, `shadows`. Dark UI only.
+- `src/theme/theme.ts` — `colors`, `fonts`, `spacing`, `radii`. Dark UI only.
 - `src/types/index.ts` — all shared types.
 - `supabase/schema.sql` — the full database schema.
 
@@ -59,6 +59,16 @@ Run `npm run typecheck` and `npm test` before every commit. There is no linter c
 ## Conventions
 
 - Styling with `StyleSheet.create` at the bottom of each file, using tokens from `src/theme/theme.ts` instead of hard-coded colors/spacing.
+
+## Design rules
+
+UI work follows the `frontend-design` skill in `.claude/skills/`. For this app that means:
+
+- Fonts: Barlow Condensed (`fonts.display`, `fonts.displayBold`) for numbers, ratings and headings; Barlow (`fonts.body*`) for reading text. Loaded in `app/_layout.tsx`. Always set `fontFamily` from `fonts`, never `fontWeight` (custom fonts ignore it on Android).
+- Color: court orange (`colors.court`) for actions and selection, gold (`colors.gold`) only for XP, levels and rewards. Category hues only label attribute groups and workouts. Success and red are for status.
+- No gradients, glow blobs, drop shadows, all-caps labels, eyebrow labels above titles, or `A · B` meta strings. Prefer hairlines and flat panels over boxed cards.
+- The OVR card is the one bold element; keep everything around it quiet.
+- Copy in sentence case, plain verbs, written for the player (no "Supabase", "build check" or marketing lines).
 - Named exports for components, hooks and helpers; default exports only for route files in `app/`.
 - Relative imports (no path aliases). 2-space indent, single quotes, semicolons, no trailing commas.
 - Keep game logic in `src/lib` as pure functions; screens and contexts call into it.

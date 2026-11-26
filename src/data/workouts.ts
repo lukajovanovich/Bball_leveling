@@ -7,7 +7,7 @@ export const WORKOUTS: WorkoutDefinition[] = [
     title: 'Shooting Workout',
     description: 'Form shooting, game-speed reps, free throws, and range work.',
     accentColor: colors.green,
-    icon: 'radio-button-on',
+    icon: 'locate-outline',
     effects: [
       { attribute: 'midRangeShot', weight: 1 },
       { attribute: 'threePointShot', weight: 1 },
@@ -20,7 +20,7 @@ export const WORKOUTS: WorkoutDefinition[] = [
     title: 'Ball Handling Workout',
     description: 'Control, counters, passing reads, and speed with the ball.',
     accentColor: colors.orange,
-    icon: 'sync-circle',
+    icon: 'repeat-outline',
     effects: [
       { attribute: 'ballHandle', weight: 1 },
       { attribute: 'passAccuracy', weight: 0.85 },
@@ -32,7 +32,7 @@ export const WORKOUTS: WorkoutDefinition[] = [
     title: 'Finishing Workout',
     description: 'Rim craft, layups, contact finishes, dunks, and post touch.',
     accentColor: colors.blue,
-    icon: 'arrow-up-circle',
+    icon: 'arrow-up-circle-outline',
     effects: [
       { attribute: 'closeShot', weight: 1 },
       { attribute: 'drivingLayup', weight: 1 },
@@ -46,7 +46,7 @@ export const WORKOUTS: WorkoutDefinition[] = [
     title: 'Defense Workout',
     description: 'Footwork, containment, hands, shot contests, and paint stops.',
     accentColor: colors.red,
-    icon: 'shield-checkmark',
+    icon: 'shield-outline',
     effects: [
       { attribute: 'interiorDefense', weight: 0.85 },
       { attribute: 'perimeterDefense', weight: 1 },
@@ -59,7 +59,7 @@ export const WORKOUTS: WorkoutDefinition[] = [
     title: 'Rebounding Workout',
     description: 'Box outs, pursuit angles, second jumps, and contact boards.',
     accentColor: colors.purple,
-    icon: 'resize',
+    icon: 'resize-outline',
     effects: [
       { attribute: 'offensiveRebound', weight: 1 },
       { attribute: 'defensiveRebound', weight: 1 },
@@ -71,7 +71,7 @@ export const WORKOUTS: WorkoutDefinition[] = [
     title: 'Athletic Workout',
     description: 'Sprint mechanics, burst, jumping, conditioning, and repeat effort.',
     accentColor: colors.yellow,
-    icon: 'flash',
+    icon: 'flash-outline',
     effects: [
       { attribute: 'speed', weight: 0.85 },
       { attribute: 'acceleration', weight: 1 },
@@ -84,7 +84,7 @@ export const WORKOUTS: WorkoutDefinition[] = [
     title: 'Strength Workout',
     description: 'Core strength, contact balance, lower body power, and glass work.',
     accentColor: colors.court,
-    icon: 'barbell',
+    icon: 'barbell-outline',
     effects: [
       { attribute: 'strength', weight: 1 },
       { attribute: 'interiorDefense', weight: 0.55 },

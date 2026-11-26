@@ -4,7 +4,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/store/AuthContext';
 import { useProgress } from '../../src/store/ProgressContext';
-import { colors, spacing } from '../../src/theme/theme';
+import { colors, fonts, spacing } from '../../src/theme/theme';
 
 export default function TabsLayout() {
   const { isLoading: isAuthLoading } = useAuth();
@@ -13,11 +13,8 @@ export default function TabsLayout() {
   if (isAuthLoading || isHydrating) {
     return (
       <View style={styles.loadingRoot}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.court} />
         <Text style={styles.loadingTitle}>Loading your player...</Text>
-        <Text style={styles.loadingText}>
-          Syncing your latest build and attributes.
-        </Text>
       </View>
     );
   }
@@ -27,19 +24,19 @@ export default function TabsLayout() {
       initialRouteName="home"
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.gold,
+        tabBarActiveTintColor: colors.court,
         tabBarInactiveTintColor: colors.textSubtle,
         tabBarStyle: {
           height: 74,
           paddingTop: 8,
           paddingBottom: 12,
-          backgroundColor: '#070A12',
+          backgroundColor: colors.background,
           borderTopColor: colors.border,
           borderTopWidth: 1
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '800'
+          fontFamily: fonts.bodyMedium,
+          fontSize: 12
         }
       }}
     >
@@ -48,7 +45,7 @@ export default function TabsLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <Ionicons name="home-outline" size={size} color={color} />
           )
         }}
       />
@@ -57,7 +54,7 @@ export default function TabsLayout() {
         options={{
           title: 'Build',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart" size={size} color={color} />
+            <Ionicons name="stats-chart-outline" size={size} color={color} />
           )
         }}
       />
@@ -66,7 +63,7 @@ export default function TabsLayout() {
         options={{
           title: 'Train',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flame" size={size} color={color} />
+            <Ionicons name="basketball-outline" size={size} color={color} />
           )
         }}
       />
@@ -75,7 +72,7 @@ export default function TabsLayout() {
         options={{
           title: 'Quests',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flag" size={size} color={color} />
+            <Ionicons name="flag-outline" size={size} color={color} />
           )
         }}
       />
@@ -84,7 +81,7 @@ export default function TabsLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <Ionicons name="person-outline" size={size} color={color} />
           )
         }}
       />
@@ -102,15 +99,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl
   },
   loadingTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '900'
-  },
-  loadingText: {
     color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600',
-    textAlign: 'center'
+    fontFamily: fonts.bodyMedium,
+    fontSize: 15
   }
 });

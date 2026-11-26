@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { MeasurementPicker } from '../../src/components/ui/MeasurementPicker';
 import { PrimaryButton } from '../../src/components/ui/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
+import { ScreenHeader } from '../../src/components/ui/ScreenHeader';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
 import {
@@ -23,7 +24,7 @@ import {
 } from '../../src/lib/measurements';
 import { useAuth } from '../../src/store/AuthContext';
 import { useProgress } from '../../src/store/ProgressContext';
-import { colors, radii, spacing } from '../../src/theme/theme';
+import { colors, fonts, radii, spacing } from '../../src/theme/theme';
 import { LengthUnit, WeightUnit } from '../../src/types';
 
 export default function ProfileScreen() {
@@ -89,23 +90,18 @@ export default function ProfileScreen() {
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>Profile</Text>
-        <Text style={styles.title}>Shape your player identity</Text>
-        <Text style={styles.subtitle}>
-          Profile edits update your current player build, and signed-in users can
-          sync that data through Supabase. Height, weight, and wingspan stay
-          editable any time.
-        </Text>
-      </View>
+      <ScreenHeader
+        title="Profile"
+        subtitle="Update your measurements whenever they change. Signed-in players sync to the cloud."
+      />
 
       <View style={styles.summaryRow}>
-        <StatPill label="OVR" value={ovr} color={colors.gold} />
-        <StatPill label="Level" value={levelInfo.level} color={colors.green} />
+        <StatPill label="OVR" value={ovr} />
+        <StatPill label="Level" value={levelInfo.level} color={colors.gold} />
       </View>
 
       <View style={styles.formCard}>
-        <SectionHeader title="Player details" color={colors.blue} />
+        <SectionHeader title="Player details" />
 
         <View style={styles.field}>
           <Text style={styles.label}>Name</Text>
@@ -247,7 +243,7 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Main Goal</Text>
+          <Text style={styles.label}>Main goal</Text>
           <TextInput
             value={draft.mainGoal}
             onChangeText={(mainGoal) =>
@@ -261,14 +257,14 @@ export default function ProfileScreen() {
         </View>
 
         <PrimaryButton
-          label={saved ? 'Saved' : 'Save Profile'}
-          icon={saved ? 'checkmark-circle' : 'save'}
+          label={saved ? 'Saved' : 'Save profile'}
+          icon={saved ? 'checkmark' : undefined}
           onPress={handleSave}
         />
       </View>
 
       <View style={styles.settingsCard}>
-        <SectionHeader title="Settings" color={colors.purple} />
+        <SectionHeader title="Settings" />
         {[
           'Training reminders',
           'Season goals',
@@ -276,7 +272,7 @@ export default function ProfileScreen() {
         ].map((setting) => (
           <View key={setting} style={styles.settingRow}>
             <Text style={styles.settingTitle}>{setting}</Text>
-            <Text style={styles.settingStatus}>Soon</Text>
+            <Text style={styles.settingStatus}>Coming soon</Text>
           </View>
         ))}
         <View style={styles.settingRow}>
@@ -293,8 +289,7 @@ export default function ProfileScreen() {
         {user ? (
           <PrimaryButton
             disabled={signingOut}
-            label={signingOut ? 'Signing Out...' : 'Sign Out'}
-            icon="log-out"
+            label={signingOut ? 'Signing out...' : 'Sign out'}
             onPress={() => {
               setSigningOut(true);
               void signOut().then((result) => {
@@ -318,36 +313,13 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    gap: spacing.sm
-  },
-  eyebrow: {
-    color: colors.gold,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase'
-  },
-  title: {
-    color: colors.text,
-    fontSize: 30,
-    lineHeight: 35,
-    fontWeight: '900'
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600'
-  },
   summaryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md
+    gap: spacing.lg
   },
   formCard: {
     borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.panel,
     padding: spacing.lg,
     gap: spacing.lg
@@ -356,9 +328,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   label: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '900'
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
   },
   input: {
     minHeight: 50,
@@ -369,8 +341,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    fontSize: 15,
-    fontWeight: '700'
+    fontFamily: fonts.bodyMedium,
+    fontSize: 16
   },
   goalInput: {
     minHeight: 96,
@@ -382,8 +354,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   positionChip: {
-    minHeight: 40,
-    borderRadius: radii.pill,
+    minHeight: 38,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.backgroundSoft,
@@ -392,21 +364,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   positionChipSelected: {
-    borderColor: colors.gold,
-    backgroundColor: 'rgba(248,214,109,0.12)'
+    borderColor: colors.court,
+    backgroundColor: 'rgba(224,123,57,0.12)'
   },
   positionText: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900'
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14
   },
   positionTextSelected: {
-    color: colors.gold
+    color: colors.text
   },
   settingsCard: {
     borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.panel,
     padding: spacing.lg,
     gap: spacing.md
@@ -422,14 +392,13 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '800'
+    fontFamily: fonts.body,
+    fontSize: 15
   },
   settingStatus: {
     color: colors.textSubtle,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase'
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14
   },
   settingStatusLive: {
     color: colors.success
@@ -439,8 +408,8 @@ const styles = StyleSheet.create({
   },
   syncError: {
     color: colors.red,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '700'
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18
   }
 });

@@ -2,30 +2,44 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityLogItem } from '../../types';
-import { colors, radii, spacing } from '../../theme/theme';
+import { colors, fonts, spacing } from '../../theme/theme';
 
 const iconByType: Record<ActivityLogItem['type'], keyof typeof Ionicons.glyphMap> = {
-  workout: 'flame',
-  quest: 'flag',
+  workout: 'basketball-outline',
+  quest: 'flag-outline',
   attribute: 'trending-up',
-  level: 'star'
+  level: 'star-outline'
+};
+
+// Colored by kind of entry rather than by the color stored on old log items,
+// so the feed stays on the app's two accents.
+const colorByType: Record<ActivityLogItem['type'], string> = {
+  workout: colors.court,
+  quest: colors.gold,
+  attribute: colors.textMuted,
+  level: colors.gold
 };
 
 interface ActivityItemProps {
   item: ActivityLogItem;
+  /** Draws a hairline above the row when it follows another entry. */
+  divided?: boolean;
 }
 
-export const ActivityItem = ({ item }: ActivityItemProps) => {
+export const ActivityItem = ({ item, divided = false }: ActivityItemProps) => {
   const date = new Date(item.createdAt);
   const dateLabel = Number.isNaN(date.getTime())
     ? ''
     : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
   return (
-    <View style={styles.item}>
-      <View style={[styles.iconShell, { backgroundColor: `${item.accentColor}20` }]}>
-        <Ionicons name={iconByType[item.type]} size={17} color={item.accentColor} />
-      </View>
+    <View style={[styles.item, divided && styles.divided]}>
+      <Ionicons
+        name={iconByType[item.type]}
+        size={18}
+        color={colorByType[item.type]}
+        style={styles.icon}
+      />
       <View style={styles.copy}>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.description}>{item.description}</Text>
@@ -37,41 +51,38 @@ export const ActivityItem = ({ item }: ActivityItemProps) => {
 
 const styles = StyleSheet.create({
   item: {
-    minHeight: 68,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.panel,
-    padding: spacing.md
+    paddingVertical: spacing.md
   },
-  iconShell: {
-    width: 38,
-    height: 38,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center'
+  divided: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border
+  },
+  icon: {
+    marginTop: 1
   },
   copy: {
     flex: 1,
-    gap: 3
+    gap: 2
   },
   title: {
     color: colors.text,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 14,
-    fontWeight: '900'
+    lineHeight: 19
   },
   description: {
     color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '600'
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18
   },
   date: {
     color: colors.textSubtle,
-    fontSize: 11,
-    fontWeight: '800'
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    lineHeight: 19
   }
 });

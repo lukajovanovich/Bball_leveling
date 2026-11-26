@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getQuestProgressLabel } from '../../lib/progression';
 import { Quest } from '../../types';
-import { colors, radii, spacing } from '../../theme/theme';
+import { colors, fonts, radii, spacing } from '../../theme/theme';
 import { XPBar } from '../ui/XPBar';
 
 interface QuestCardProps {
@@ -14,23 +14,23 @@ export const QuestCard = ({ quest }: QuestCardProps) => {
   const isComplete = quest.completed && quest.claimed;
 
   return (
-    <View style={[styles.card, isComplete && styles.completedCard]}>
+    <View style={styles.card}>
       <View style={styles.header}>
-        <View style={[styles.iconShell, isComplete && styles.completedIconShell]}>
-          <Ionicons
-            name={isComplete ? 'checkmark' : 'flag'}
-            size={18}
-            color={isComplete ? colors.black : colors.gold}
-          />
-        </View>
         <View style={styles.copy}>
-          <Text style={styles.title}>{quest.title}</Text>
+          <View style={styles.titleRow}>
+            {isComplete ? (
+              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+            ) : null}
+            <Text style={[styles.title, isComplete && styles.titleComplete]}>
+              {quest.title}
+            </Text>
+          </View>
           <Text style={styles.description}>{quest.description}</Text>
         </View>
-        <View style={styles.reward}>
-          <Text style={styles.rewardValue}>+{quest.rewardXp}</Text>
-          <Text style={styles.rewardLabel}>XP</Text>
-        </View>
+        <Text style={styles.reward}>
+          +{quest.rewardXp}
+          <Text style={styles.rewardUnit}> XP</Text>
+        </Text>
       </View>
       <XPBar
         color={isComplete ? colors.success : colors.gold}
@@ -46,60 +46,48 @@ export const QuestCard = ({ quest }: QuestCardProps) => {
 const styles = StyleSheet.create({
   card: {
     borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.panel,
     padding: spacing.lg,
-    gap: spacing.lg
-  },
-  completedCard: {
-    borderColor: 'rgba(88,230,166,0.28)'
+    gap: spacing.md
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md
-  },
-  iconShell: {
-    width: 38,
-    height: 38,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(248,214,109,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(248,214,109,0.22)'
-  },
-  completedIconShell: {
-    backgroundColor: colors.success,
-    borderColor: colors.success
   },
   copy: {
     flex: 1,
-    gap: 3
+    gap: 2
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs
   },
   title: {
+    flexShrink: 1,
     color: colors.text,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 15,
-    fontWeight: '900'
+    lineHeight: 20
+  },
+  titleComplete: {
+    color: colors.textMuted
   },
   description: {
     color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '600'
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18
   },
   reward: {
-    alignItems: 'flex-end'
-  },
-  rewardValue: {
     color: colors.gold,
-    fontSize: 14,
-    fontWeight: '900'
+    fontFamily: fonts.displayBold,
+    fontSize: 22,
+    lineHeight: 24
   },
-  rewardLabel: {
-    color: colors.textSubtle,
-    fontSize: 10,
-    fontWeight: '900'
+  rewardUnit: {
+    fontFamily: fonts.display,
+    fontSize: 14
   }
 });

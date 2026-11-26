@@ -8,7 +8,6 @@ import {
   useWindowDimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../theme/theme';
 
 interface ScreenContainerProps extends PropsWithChildren {
@@ -30,12 +29,6 @@ export const ScreenContainer = ({
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={[colors.background, colors.backgroundSoft, colors.background]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {scroll ? (
           <ScrollView
@@ -67,7 +60,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    gap: spacing.lg
+    paddingTop: spacing.xl,
+    gap: spacing.xl
   }
 });

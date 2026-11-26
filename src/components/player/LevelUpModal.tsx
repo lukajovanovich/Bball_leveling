@@ -1,9 +1,7 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import { useProgress } from '../../store/ProgressContext';
-import { colors, radii, shadows, spacing } from '../../theme/theme';
+import { colors, fonts, radii, spacing } from '../../theme/theme';
 import { PrimaryButton } from '../ui/PrimaryButton';
 
 export const LevelUpModal = () => {
@@ -13,23 +11,20 @@ export const LevelUpModal = () => {
   return (
     <Modal visible={Boolean(levelUp)} transparent animationType="fade">
       <View style={styles.overlay}>
-        <LinearGradient
-          colors={[colors.panelElevated, '#1A1320', colors.panel]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.card}
-        >
-          <View style={styles.iconShell}>
-            <Ionicons name="star" size={32} color={colors.black} />
-          </View>
-          <Text style={styles.kicker}>Level Up</Text>
-          <Text style={styles.level}>Level {levelUp?.level}</Text>
-          <Text style={styles.copy}>
-            Your real work paid off. Your player profile just jumped from Level{' '}
-            {levelUp?.previousLevel}.
+        <View style={styles.card}>
+          <Text style={styles.heading}>Level up</Text>
+          <Text testID="level-up-level" style={styles.level}>
+            {levelUp?.level}
           </Text>
-          <PrimaryButton label="Keep Grinding" icon="arrow-forward" onPress={dismissLevelUp} />
-        </LinearGradient>
+          <Text style={styles.copy}>
+            Up from level {levelUp?.previousLevel}. Your training is showing.
+          </Text>
+          <PrimaryButton
+            label="Keep training"
+            onPress={dismissLevelUp}
+            style={styles.button}
+          />
+        </View>
       </View>
     </Modal>
   );
@@ -41,44 +36,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
-    backgroundColor: 'rgba(0,0,0,0.72)'
+    backgroundColor: 'rgba(2,4,10,0.82)'
   },
   card: {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 380,
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: 'rgba(242,207,107,0.35)',
+    backgroundColor: colors.panel,
     padding: spacing.xl,
     alignItems: 'center',
-    gap: spacing.lg,
-    ...shadows.card
+    gap: spacing.sm
   },
-  iconShell: {
-    width: 72,
-    height: 72,
-    borderRadius: radii.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.gold
-  },
-  kicker: {
+  heading: {
     color: colors.gold,
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase'
+    fontFamily: fonts.displayBold,
+    fontSize: 24
   },
   level: {
     color: colors.text,
-    fontSize: 42,
-    lineHeight: 46,
-    fontWeight: '900'
+    fontFamily: fonts.displayBold,
+    fontSize: 120,
+    lineHeight: 124
   },
   copy: {
     color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: 15,
     lineHeight: 22,
-    textAlign: 'center',
-    fontWeight: '600'
+    textAlign: 'center'
+  },
+  button: {
+    alignSelf: 'stretch',
+    marginTop: spacing.md
   }
 });
