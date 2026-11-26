@@ -59,6 +59,9 @@ Run `npm run typecheck` and `npm test` before every commit. There is no linter c
 ## Conventions
 
 - Styling with `StyleSheet.create` at the bottom of each file, using tokens from `src/theme/theme.ts` instead of hard-coded colors/spacing.
+- Named exports for components, hooks and helpers; default exports only for route files in `app/`.
+- Relative imports (no path aliases). 2-space indent, single quotes, semicolons, no trailing commas.
+- Keep game logic in `src/lib` as pure functions; screens and contexts call into it.
 
 ## Design rules
 
@@ -69,9 +72,6 @@ UI work follows the `frontend-design` skill in `.claude/skills/`. For this app t
 - No gradients, glow blobs, drop shadows, all-caps labels, eyebrow labels above titles, or `A · B` meta strings. Prefer hairlines and flat panels over boxed cards.
 - The OVR card is the one bold element; keep everything around it quiet.
 - Copy in sentence case, plain verbs, written for the player (no "Supabase", "build check" or marketing lines).
-- Named exports for components, hooks and helpers; default exports only for route files in `app/`.
-- Relative imports (no path aliases). 2-space indent, single quotes, semicolons, no trailing commas.
-- Keep game logic in `src/lib` as pure functions; screens and contexts call into it.
 
 ## Environment
 
