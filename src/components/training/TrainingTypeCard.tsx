@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { WorkoutAvailability } from '../../lib/progression';
 import { WorkoutDefinition } from '../../types';
 import { colors, fonts, radii, spacing } from '../../theme/theme';
 
@@ -8,47 +9,70 @@ interface TrainingTypeCardProps {
   workout: WorkoutDefinition;
   selected: boolean;
   onPress: () => void;
+  /** Today's limit for this workout; defaults to 'available'. */
+  availability?: WorkoutAvailability;
 }
+
+const statusLabel: Record<WorkoutAvailability, string | null> = {
+  available: null,
+  bonus: 'Done today. Your bonus can repeat it.',
+  locked: 'Done today'
+};
 
 export const TrainingTypeCard = ({
   workout,
   selected,
-  onPress
-}: TrainingTypeCardProps) => (
-  <Pressable
-    accessibilityRole="button"
-    accessibilityState={{ selected }}
-    onPress={onPress}
-    style={({ pressed }) => [
-      styles.card,
-      selected && {
-        borderColor: workout.accentColor,
-        backgroundColor: colors.panelElevated
-      },
-      pressed && styles.pressed
-    ]}
-  >
-    <Ionicons
-      name={workout.icon as keyof typeof Ionicons.glyphMap}
-      size={22}
-      color={selected ? workout.accentColor : colors.textMuted}
-    />
-    <View style={styles.copy}>
-      <Text style={styles.title}>{workout.title}</Text>
-      <Text style={styles.description}>{workout.description}</Text>
-    </View>
-    <View
-      style={[
-        styles.radio,
-        selected && { borderColor: workout.accentColor }
+  onPress,
+  availability = 'available'
+}: TrainingTypeCardProps) => {
+  const locked = availability === 'locked';
+  const status = statusLabel[availability];
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected, disabled: locked }}
+      disabled={locked}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        selected && {
+          borderColor: workout.accentColor,
+          backgroundColor: colors.panelElevated
+        },
+        locked && styles.locked,
+        pressed && styles.pressed
       ]}
     >
-      {selected ? (
-        <View style={[styles.radioDot, { backgroundColor: workout.accentColor }]} />
-      ) : null}
-    </View>
-  </Pressable>
-);
+      <Ionicons
+        name={workout.icon as keyof typeof Ionicons.glyphMap}
+        size={22}
+        color={selected ? workout.accentColor : colors.textMuted}
+      />
+      <View style={styles.copy}>
+        <Text style={styles.title}>{workout.title}</Text>
+        <Text style={styles.description}>{workout.description}</Text>
+        {status ? (
+          <View style={styles.statusRow}>
+            <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+            <Text style={styles.status}>{status}</Text>
+          </View>
+        ) : null}
+      </View>
+      {locked ? null : (
+        <View
+          style={[styles.radio, selected && { borderColor: workout.accentColor }]}
+        >
+          {selected ? (
+            <View
+              style={[styles.radioDot, { backgroundColor: workout.accentColor }]}
+            />
+          ) : null}
+        </View>
+      )}
+    </Pressable>
+  );
+};
 
 const styles = StyleSheet.create({
   card: {
@@ -61,6 +85,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.panel,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg
+  },
+  locked: {
+    opacity: 0.55
   },
   pressed: {
     backgroundColor: colors.panelElevated
@@ -80,6 +107,17 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 13,
     lineHeight: 18
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: 2
+  },
+  status: {
+    color: colors.success,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12
   },
   radio: {
     width: 20,

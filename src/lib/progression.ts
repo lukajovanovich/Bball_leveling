@@ -344,6 +344,67 @@ export const applyWorkoutToProgress = (
   };
 };
 
+// Free plan: each workout type once per day, plus this many repeats of any type.
+export const DAILY_BONUS_WORKOUTS = 1;
+
+/** The player's local calendar day, e.g. "2026-11-26"; limits reset at local midnight. */
+export const getLocalDayKey = (date: Date) => {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
+export interface DailyWorkoutStatus {
+  /** Workout types already logged today. */
+  loggedTypes: WorkoutType[];
+  sessionsToday: number;
+  bonusLeft: number;
+}
+
+export const getDailyWorkoutStatus = (
+  sessions: readonly TrainingSession[],
+  now: Date = new Date()
+): DailyWorkoutStatus => {
+  const today = getLocalDayKey(now);
+  const todaysSessions = sessions.filter((session) => {
+    const completedAt = new Date(session.completedAt);
+
+    return (
+      !Number.isNaN(completedAt.getTime()) && getLocalDayKey(completedAt) === today
+    );
+  });
+  const loggedTypes = Array.from(
+    new Set(todaysSessions.map((session) => session.workoutType))
+  );
+  // Every session past the first of its type used up a bonus.
+  const bonusUsed = todaysSessions.length - loggedTypes.length;
+
+  return {
+    loggedTypes,
+    sessionsToday: todaysSessions.length,
+    bonusLeft: Math.max(0, DAILY_BONUS_WORKOUTS - bonusUsed)
+  };
+};
+
+export type WorkoutAvailability = 'available' | 'bonus' | 'locked';
+
+/**
+ * 'available': first time this type is logged today.
+ * 'bonus': already logged today, but a bonus repeat is left.
+ * 'locked': already logged today and the bonus is used up.
+ */
+export const getWorkoutAvailability = (
+  status: DailyWorkoutStatus,
+  workoutType: WorkoutType
+): WorkoutAvailability => {
+  if (!status.loggedTypes.includes(workoutType)) {
+    return 'available';
+  }
+
+  return status.bonusLeft > 0 ? 'bonus' : 'locked';
+};
+
 export const getQuestProgressLabel = (quest: Quest) => {
   if (quest.kind === 'reach_attribute' && quest.attributeKey) {
     return `${Math.round(quest.progress)} / ${quest.goal}`;

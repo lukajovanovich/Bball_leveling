@@ -4,20 +4,25 @@ import { WORKOUTS } from '../../src/data/workouts';
 import {
   ATTRIBUTE_MAX,
   ATTRIBUTE_MIN,
+  DAILY_BONUS_WORKOUTS,
   INTENSITY_CONFIG,
   applyWorkoutToProgress,
   calculateOvr,
   calculateWorkoutResult,
   clampAttribute,
   getCategoryAverage,
+  getDailyWorkoutStatus,
   getLevelInfo,
+  getLocalDayKey,
   getQuestProgressLabel,
+  getWorkoutAvailability,
   getWorkoutDefinition,
   getXpNeededForLevel
 } from '../../src/lib/progression';
 import {
   AttributeKey,
   ProgressState,
+  TrainingSession,
   WorkoutIntensity,
   WorkoutType
 } from '../../src/types';
@@ -698,5 +703,100 @@ describe('getQuestProgressLabel', () => {
     expect(getQuestProgressLabel(findQuest(state, 'weekly-finishing-two'))).toBe(
       '0 / 2'
     );
+  });
+});
+
+describe('daily workout limit', () => {
+  // Local time, so the tests mean the same day in every time zone.
+  const at = (day: number, hour: number, minute = 0) =>
+    new Date(2026, 10, day, hour, minute);
+
+  const session = (workoutType: WorkoutType, completedAt: Date): TrainingSession => ({
+    id: `session-${workoutType}-${completedAt.getTime()}`,
+    workoutType,
+    intensity: 'medium',
+    xpGained: 120,
+    questXpGained: 0,
+    attributeGains: {},
+    completedAt: completedAt.toISOString()
+  });
+
+  it('gives one bonus repeat a day', () => {
+    expect(DAILY_BONUS_WORKOUTS).toBe(1);
+  });
+
+  it('formats the local calendar day', () => {
+    expect(getLocalDayKey(at(5, 0, 0))).toBe('2026-11-05');
+    expect(getLocalDayKey(at(5, 23, 59))).toBe('2026-11-05');
+  });
+
+  it('starts each day with every workout and the bonus available', () => {
+    const status = getDailyWorkoutStatus([], at(26, 9));
+
+    expect(status).toEqual({ loggedTypes: [], sessionsToday: 0, bonusLeft: 1 });
+    WORKOUTS.forEach((workout) => {
+      expect(getWorkoutAvailability(status, workout.type)).toBe('available');
+    });
+  });
+
+  it('allows every type once a day even after the bonus is used', () => {
+    const now = at(26, 20);
+    const sessions = [
+      session('shooting', at(26, 8)),
+      session('shooting', at(26, 9)),
+      ...WORKOUTS.filter((workout) => workout.type !== 'shooting').map((workout, index) =>
+        session(workout.type, at(26, 10 + index))
+      )
+    ];
+    const status = getDailyWorkoutStatus(sessions, now);
+
+    // 7 types once each plus the one bonus repeat
+    expect(status.sessionsToday).toBe(8);
+    expect(status.bonusLeft).toBe(0);
+    WORKOUTS.forEach((workout) => {
+      expect(getWorkoutAvailability(status, workout.type)).toBe('locked');
+    });
+  });
+
+  it('offers the bonus to repeat a type logged today, then locks it', () => {
+    const now = at(26, 18);
+    const once = getDailyWorkoutStatus([session('shooting', at(26, 7))], now);
+
+    expect(getWorkoutAvailability(once, 'shooting')).toBe('bonus');
+    expect(getWorkoutAvailability(once, 'defense')).toBe('available');
+
+    const twice = getDailyWorkoutStatus(
+      [session('shooting', at(26, 17)), session('shooting', at(26, 7))],
+      now
+    );
+
+    expect(twice.bonusLeft).toBe(0);
+    expect(getWorkoutAvailability(twice, 'shooting')).toBe('locked');
+    // the bonus is shared: no second repeat of another type either
+    const withDefense = getDailyWorkoutStatus(
+      [
+        session('defense', at(26, 12)),
+        session('shooting', at(26, 17)),
+        session('shooting', at(26, 7))
+      ],
+      now
+    );
+    expect(getWorkoutAvailability(withDefense, 'defense')).toBe('locked');
+  });
+
+  it('resets at local midnight', () => {
+    const sessions = [session('shooting', at(25, 22)), session('shooting', at(25, 23, 59))];
+
+    const lateNight = getDailyWorkoutStatus(sessions, at(25, 23, 59));
+    expect(getWorkoutAvailability(lateNight, 'shooting')).toBe('locked');
+
+    const nextDay = getDailyWorkoutStatus(sessions, at(26, 0, 0));
+    expect(nextDay).toEqual({ loggedTypes: [], sessionsToday: 0, bonusLeft: 1 });
+  });
+
+  it('ignores sessions with a broken timestamp', () => {
+    const broken = { ...session('shooting', at(26, 8)), completedAt: 'not a date' };
+
+    expect(getDailyWorkoutStatus([broken], at(26, 9)).sessionsToday).toBe(0);
   });
 });

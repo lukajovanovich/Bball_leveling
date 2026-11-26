@@ -117,7 +117,9 @@ describe('Home screen', () => {
     );
 
     await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Log medium workout with bonus' })
+    );
 
     // newest first: the two fresh workouts push the seeded entries out
     expect(screen.getAllByText('Shooting Workout completed').length).toBeGreaterThan(0);
@@ -232,10 +234,10 @@ describe('Train screen', () => {
 
   it('pays quest XP only once across repeated workouts', async () => {
     await renderApp(<TrainScreen />);
-    const logButton = () => screen.getByRole('button', { name: 'Log medium workout' });
-
-    await fireEvent.press(logButton());
-    await fireEvent.press(logButton());
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Log medium workout with bonus' })
+    );
 
     // "+120 XP" is the Medium intensity label and now also the result total
     expect(screen.getAllByText('+120 XP')).toHaveLength(2);
@@ -302,9 +304,53 @@ describe('Train screen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Keep training' }));
     await fireEvent.press(screen.getByText('Light'));
-    await fireEvent.press(screen.getByRole('button', { name: 'Log light workout' }));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Log light workout with bonus' })
+    );
 
     expect(screen.queryByText('Level up')).not.toBeOnTheScreen();
+  });
+});
+
+describe('Train screen daily limit', () => {
+  it('allows each workout once, then one bonus repeat, then locks it for the day', async () => {
+    await renderApp(<TrainScreen />);
+
+    expect(screen.getByText('Available')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    expect(screen.getByText('Done today. Your bonus can repeat it.')).toBeOnTheScreen();
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Log medium workout with bonus' })
+    );
+    expect(readProbe().sessions).toBe(2);
+    expect(screen.getByText('Used')).toBeOnTheScreen();
+    expect(screen.getByText('Done today')).toBeOnTheScreen();
+
+    const lockedButton = screen.getByRole('button', {
+      name: 'Shooting Workout done for today'
+    });
+    expect(lockedButton).toBeDisabled();
+    await fireEvent.press(lockedButton);
+    expect(readProbe().sessions).toBe(2);
+  });
+
+  it('still allows every other workout once after the bonus is used', async () => {
+    await renderApp(<TrainScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Log medium workout with bonus' })
+    );
+    await fireEvent.press(screen.getByText('Defense Workout'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+
+    expect(readProbe().sessions).toBe(3);
+    // Defense is now done and there is no bonus left to repeat it
+    expect(
+      screen.getByRole('button', { name: 'Defense Workout done for today' })
+    ).toBeDisabled();
   });
 });
 

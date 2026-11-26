@@ -72,6 +72,27 @@ describe('guest mode', () => {
     expect(mockControls.upsert).not.toHaveBeenCalled();
   });
 
+  it('refuses a workout past the daily limit and changes nothing', async () => {
+    const { result } = await renderProgress();
+
+    await act(async () => {
+      result.current.progress.logWorkout('shooting', 'medium');
+    });
+    await act(async () => {
+      result.current.progress.logWorkout('shooting', 'medium');
+    });
+    const before = result.current.progress.state;
+
+    let update: unknown = 'not called';
+    await act(async () => {
+      update = result.current.progress.logWorkout('shooting', 'hard');
+    });
+
+    expect(update).toBeNull();
+    expect(result.current.progress.state).toBe(before);
+    expect(result.current.progress.state.trainingSessions).toHaveLength(2);
+  });
+
   it('works when Supabase is not configured at all', async () => {
     mockControls.setConfigured(false);
 

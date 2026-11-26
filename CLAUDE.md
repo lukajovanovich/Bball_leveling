@@ -54,6 +54,7 @@ Run `npm run typecheck` and `npm test` before every commit. There is no linter c
 - **Never save before the cloud row was read**: `ProgressContext` only upserts after it has loaded (or created) the signed-in user's row. If that load fails, local state is placeholder data and saving it would overwrite the user's real progress.
 - **Error messages** shown to the user go through `describeError` in `src/lib/authErrors.ts`, which turns raw network failures ("Failed to fetch") into a readable message.
 - **Missing env**: the app must still boot without Supabase env vars (`isSupabaseConfigured` is false, placeholder client, local-only state). Keep that path working.
+- **Daily workout limit (free plan)**: each workout type once per local calendar day plus `DAILY_BONUS_WORKOUTS` repeats of any type. It is derived from `trainingSessions` timestamps by `getDailyWorkoutStatus` / `getWorkoutAvailability` in `progression.ts` (no extra stored state), enforced in `ProgressContext.logWorkout` (returns `null` when blocked) and shown on the Train screen. `trainingSessions` keeps the last 30, which must stay above the daily maximum.
 - Attributes are clamped to 0–99 (`ATTRIBUTE_MIN` / `ATTRIBUTE_MAX`). Game-balance numbers (XP per level, intensity multipliers, workout effect weights) live in `src/lib/progression.ts` and `src/data/workouts.ts` — keep them there, not inline in screens.
 
 ## Conventions

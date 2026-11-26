@@ -26,7 +26,9 @@ import {
 import {
   applyWorkoutToProgress,
   calculateOvr,
-  getLevelInfo
+  getDailyWorkoutStatus,
+  getLevelInfo,
+  getWorkoutAvailability
 } from '../lib/progression';
 import { PlayerProfile, ProgressState, ProgressUpdate, WorkoutIntensity, WorkoutType } from '../types';
 import { useAuth } from './AuthContext';
@@ -52,10 +54,11 @@ interface ProgressContextValue {
   levelInfo: ReturnType<typeof getLevelInfo>;
   isHydrating: boolean;
   syncError: string | null;
+  /** Returns null, and changes nothing, when today's limit blocks this workout. */
   logWorkout: (
     workoutType: WorkoutType,
     intensity: WorkoutIntensity
-  ) => ProgressUpdate;
+  ) => ProgressUpdate | null;
   updateProfile: (profile: Partial<EditableProfileFields>) => void;
   createNewProfile: (profile: EditableProfileFields) => void;
   dismissLevelUp: () => void;
@@ -216,6 +219,12 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
 
   const logWorkout = useCallback(
     (workoutType: WorkoutType, intensity: WorkoutIntensity) => {
+      const status = getDailyWorkoutStatus(state.trainingSessions);
+
+      if (getWorkoutAvailability(status, workoutType) === 'locked') {
+        return null;
+      }
+
       const update = applyWorkoutToProgress(state, workoutType, intensity);
       setState(update.state);
       void persistProgressState(update.state);

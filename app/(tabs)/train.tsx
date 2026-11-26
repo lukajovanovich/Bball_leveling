@@ -10,6 +10,8 @@ import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
 import {
   INTENSITY_CONFIG,
+  getDailyWorkoutStatus,
+  getWorkoutAvailability,
   getWorkoutDefinition
 } from '../../src/lib/progression';
 import { useProgress } from '../../src/store/ProgressContext';
@@ -24,7 +26,7 @@ import { colors, fonts, radii, spacing } from '../../src/theme/theme';
 const intensityOptions: WorkoutIntensity[] = ['light', 'medium', 'hard'];
 
 export default function TrainScreen() {
-  const { logWorkout, ovr, levelInfo } = useProgress();
+  const { logWorkout, ovr, levelInfo, state } = useProgress();
   const [selectedType, setSelectedType] = useState<WorkoutType>('shooting');
   const [intensity, setIntensity] = useState<WorkoutIntensity>('medium');
   const [lastResult, setLastResult] = useState<ProgressUpdate | null>(null);
@@ -44,9 +46,24 @@ export default function TrainScreen() {
     ? (Object.entries(lastResult.attributeGains) as [AttributeKey, number][])
     : [];
 
+  // Computed on every render so the limit resets once the local day changes.
+  const daily = getDailyWorkoutStatus(state.trainingSessions);
+  const availabilityOf = (type: WorkoutType) => getWorkoutAvailability(daily, type);
+  const selectedAvailability = availabilityOf(selectedType);
+  const intensityLabel = INTENSITY_CONFIG[intensity].label.toLowerCase();
+  const buttonLabel =
+    selectedAvailability === 'available'
+      ? `Log ${intensityLabel} workout`
+      : selectedAvailability === 'bonus'
+        ? `Log ${intensityLabel} workout with bonus`
+        : `${selectedWorkout.title} done for today`;
+
   const handleLogWorkout = () => {
     const update = logWorkout(selectedType, intensity);
-    setLastResult(update);
+
+    if (update) {
+      setLastResult(update);
+    }
   };
 
   return (
@@ -56,19 +73,33 @@ export default function TrainScreen() {
         subtitle="Pick what you trained and how hard. Your ratings update right away."
       />
 
-      <View style={styles.summaryRow}>
-        <StatPill label="Current OVR" value={ovr} />
-        <StatPill label="Level" value={levelInfo.level} color={colors.gold} />
+      <View style={styles.summary}>
+        <View style={styles.summaryRow}>
+          <StatPill label="Current OVR" value={ovr} />
+          <StatPill label="Level" value={levelInfo.level} color={colors.gold} />
+        </View>
+        <View style={styles.summaryRow}>
+          <StatPill label="Workouts today" value={daily.sessionsToday} />
+          <StatPill
+            label="Bonus workout"
+            value={daily.bonusLeft > 0 ? 'Available' : 'Used'}
+            color={daily.bonusLeft > 0 ? colors.success : colors.textMuted}
+          />
+        </View>
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="What did you work on?" />
+        <SectionHeader
+          title="What did you work on?"
+          subtitle="Each workout counts once a day. One bonus a day lets you repeat any of them."
+        />
         <View style={styles.stack}>
           {WORKOUTS.map((workout) => (
             <TrainingTypeCard
               key={workout.type}
               workout={workout}
               selected={workout.type === selectedType}
+              availability={availabilityOf(workout.type)}
               onPress={() => setSelectedType(workout.type)}
             />
           ))}
@@ -106,7 +137,8 @@ export default function TrainScreen() {
       </View>
 
       <PrimaryButton
-        label={`Log ${INTENSITY_CONFIG[intensity].label.toLowerCase()} workout`}
+        label={buttonLabel}
+        disabled={selectedAvailability === 'locked'}
         onPress={handleLogWorkout}
       />
 
@@ -159,6 +191,9 @@ export default function TrainScreen() {
 }
 
 const styles = StyleSheet.create({
+  summary: {
+    gap: spacing.lg
+  },
   summaryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
