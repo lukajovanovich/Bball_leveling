@@ -9,6 +9,8 @@ import {
   ProgressUpdate,
   Quest,
   TrainingSession,
+  WorkoutDefinition,
+  WorkoutEffect,
   WorkoutIntensity,
   WorkoutType
 } from '../types';
@@ -123,38 +125,224 @@ export const calculateOvr = (attributes: PlayerAttributes) => {
   return clampAttribute(weighted * 0.94 + topSkillAverage * 0.06);
 };
 
-export const calculateWorkoutResult = (
-  type: WorkoutType,
-  intensity: WorkoutIntensity,
+type AttributeGains = Partial<Record<AttributeKey, number>>;
+
+// Focused sessions put more into each picked rating than a general session
+// would (x1.5 per point of weight), but never more in total: see
+// calculateWorkoutResult.
+export const FOCUS_GAIN_MULTIPLIER = 1.5;
+
+// Ratings get harder to raise near the top: -1 from 80, at most +1 from 88,
+// and never past 99.
+const limitGain = (gain: number, currentValue: number) => {
+  let limited = gain;
+
+  if (currentValue >= 88) {
+    limited = Math.min(limited, 1);
+  } else if (currentValue >= 80) {
+    limited = Math.max(1, limited - 1);
+  }
+
+  return Math.min(limited, Math.max(0, ATTRIBUTE_MAX - currentValue));
+};
+
+const weightedGains = (
+  effects: readonly WorkoutEffect[],
+  gainBase: number,
   attributes: PlayerAttributes
 ) => {
-  const workout = getWorkoutDefinition(type);
-  const config = INTENSITY_CONFIG[intensity];
-  const attributeGains: Partial<Record<AttributeKey, number>> = {};
+  const gains: AttributeGains = {};
 
-  workout.effects.forEach((effect) => {
-    const currentValue = attributes[effect.attribute];
-    const rawGain = config.gainBase * effect.weight;
-    let gain = Math.max(1, Math.floor(rawGain));
+  effects.forEach((effect) => {
+    const gain = limitGain(
+      Math.max(1, Math.floor(gainBase * effect.weight)),
+      attributes[effect.attribute]
+    );
 
-    if (currentValue >= 88) {
-      gain = Math.min(gain, 1);
-    } else if (currentValue >= 80) {
-      gain = Math.max(1, gain - 1);
-    }
-
-    const cappedGain = Math.max(0, ATTRIBUTE_MAX - currentValue);
-    const finalGain = Math.min(gain, cappedGain);
-
-    if (finalGain > 0) {
-      attributeGains[effect.attribute] = finalGain;
+    if (gain > 0) {
+      gains[effect.attribute] = gain;
     }
   });
 
+  return gains;
+};
+
+const sumGains = (gains: AttributeGains) =>
+  Object.values(gains).reduce((sum, gain) => sum + (gain ?? 0), 0);
+
+/** Keeps only focus ids the workout defines, once each, in definition order. */
+export const normalizeWorkoutFocus = (
+  workout: WorkoutDefinition,
+  focus: readonly string[] | undefined
+) =>
+  workout.focusOptions
+    .filter((option) => focus?.includes(option.id))
+    .map((option) => option.id);
+
+// Several picked focus options can train the same rating; the strongest
+// weight wins so picking more options never stacks the same attribute.
+const combineFocusEffects = (workout: WorkoutDefinition, focus: readonly string[]) => {
+  const weights = new Map<AttributeKey, number>();
+
+  workout.focusOptions
+    .filter((option) => focus.includes(option.id))
+    .forEach((option) => {
+      option.effects.forEach((effect) => {
+        weights.set(
+          effect.attribute,
+          Math.max(weights.get(effect.attribute) ?? 0, effect.weight)
+        );
+      });
+    });
+
+  return Array.from(weights, ([attribute, weight]) => ({ attribute, weight }));
+};
+
+// Takes points away, one at a time, from the biggest gain (ties: the lowest
+// weight) until the session total fits the budget. No gain drops below 1.
+const trimToBudget = (
+  gains: AttributeGains,
+  effects: readonly WorkoutEffect[],
+  budget: number
+) => {
+  const trimmed = { ...gains };
+  let total = sumGains(trimmed);
+
+  while (total > budget) {
+    let pick: WorkoutEffect | undefined;
+
+    for (const effect of effects) {
+      const gain = trimmed[effect.attribute] ?? 0;
+      const pickGain = pick ? trimmed[pick.attribute] ?? 0 : 0;
+
+      if (
+        gain > 1 &&
+        (gain > pickGain || (pick && gain === pickGain && effect.weight < pick.weight))
+      ) {
+        pick = effect;
+      }
+    }
+
+    if (!pick) {
+      break;
+    }
+
+    trimmed[pick.attribute] = (trimmed[pick.attribute] ?? 0) - 1;
+    total -= 1;
+  }
+
+  return trimmed;
+};
+
+// A game: one +1 to the lowest rating of every category, then the remaining
+// points to the lowest ratings overall. Each rating moves at most +1.
+const spreadGains = (count: number, attributes: PlayerAttributes) => {
+  const gains: AttributeGains = {};
+  const canGrow = (key: AttributeKey) =>
+    gains[key] === undefined && limitGain(1, attributes[key]) > 0;
+  const lowest = (keys: AttributeKey[]) =>
+    keys
+      .filter(canGrow)
+      .reduce<AttributeKey | null>(
+        (best, key) => (best === null || attributes[key] < attributes[best] ? key : best),
+        null
+      );
+  let left = count;
+
+  ATTRIBUTE_CATEGORIES.forEach((category) => {
+    const key = lowest(category.attributes.map((attribute) => attribute.key));
+
+    if (key && left > 0) {
+      gains[key] = 1;
+      left -= 1;
+    }
+  });
+
+  const allKeys = ATTRIBUTE_CATEGORIES.flatMap((category) =>
+    category.attributes.map((attribute) => attribute.key)
+  );
+
+  while (left > 0) {
+    const key = lowest(allKeys);
+
+    if (!key) {
+      break;
+    }
+
+    gains[key] = 1;
+    left -= 1;
+  }
+
+  return gains;
+};
+
+/**
+ * With no focus picked, every attribute in the workout gets
+ * max(1, floor(gainBase x weight)). With focus picked, only the focus
+ * attributes move, at max(1, floor(gainBase x 1.5 x focus weight)), trimmed so
+ * the total never exceeds what the general session would give this player.
+ */
+export const calculateWorkoutResult = (
+  type: WorkoutType,
+  intensity: WorkoutIntensity,
+  attributes: PlayerAttributes,
+  focus: readonly string[] = []
+) => {
+  const workout = getWorkoutDefinition(type);
+  const config = INTENSITY_CONFIG[intensity];
+
+  if (workout.spreadGains) {
+    return {
+      xpGained: config.xp,
+      attributeGains: spreadGains(workout.spreadGains[intensity], attributes)
+    };
+  }
+
+  const generalGains = weightedGains(workout.effects, config.gainBase, attributes);
+  const pickedFocus = normalizeWorkoutFocus(workout, focus);
+
+  if (pickedFocus.length === 0) {
+    return { xpGained: config.xp, attributeGains: generalGains };
+  }
+
+  const focusEffects = combineFocusEffects(workout, pickedFocus);
+  const focusGains = weightedGains(
+    focusEffects,
+    config.gainBase * FOCUS_GAIN_MULTIPLIER,
+    attributes
+  );
+
   return {
     xpGained: config.xp,
-    attributeGains
+    attributeGains: trimToBudget(focusGains, focusEffects, sumGains(generalGains))
   };
+};
+
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
+const focusLabels = (type: WorkoutType, focus: readonly string[] | undefined) =>
+  getWorkoutDefinition(type)
+    .focusOptions.filter((option) => focus?.includes(option.id))
+    .map((option) => option.label);
+
+/** "Three-pointers, off the dribble / fadeaways", or '' for a general session. */
+export const describeWorkoutFocus = (
+  type: WorkoutType,
+  focus: readonly string[] | undefined
+) =>
+  focusLabels(type, focus)
+    .map((label, index) => (index === 0 ? label : lowerFirst(label)))
+    .join(', ');
+
+/** "Shooting Workout: three-pointers, free throws", or just the title with no focus. */
+export const formatWorkoutName = (
+  type: WorkoutType,
+  focus: readonly string[] | undefined
+) => {
+  const title = getWorkoutDefinition(type).title;
+  const labels = focusLabels(type, focus).map(lowerFirst);
+
+  return labels.length > 0 ? `${title}: ${labels.join(', ')}` : title;
 };
 
 const applyAttributeGains = (
@@ -225,11 +413,18 @@ const describeGains = (gains: Partial<Record<AttributeKey, number>>) => {
 export const applyWorkoutToProgress = (
   state: ProgressState,
   workoutType: WorkoutType,
-  intensity: WorkoutIntensity
+  intensity: WorkoutIntensity,
+  focus: readonly string[] = []
 ): ProgressUpdate => {
   const workout = getWorkoutDefinition(workoutType);
+  const pickedFocus = normalizeWorkoutFocus(workout, focus);
   const beforeLevel = getLevelInfo(state.player.totalXp).level;
-  const result = calculateWorkoutResult(workoutType, intensity, state.player.attributes);
+  const result = calculateWorkoutResult(
+    workoutType,
+    intensity,
+    state.player.attributes,
+    pickedFocus
+  );
   const nextAttributes = applyAttributeGains(
     state.player.attributes,
     result.attributeGains
@@ -276,7 +471,9 @@ export const applyWorkoutToProgress = (
     xpGained: result.xpGained,
     questXpGained,
     attributeGains: result.attributeGains,
-    completedAt
+    completedAt,
+    // Left out for a general session so those rows look the same as before.
+    ...(pickedFocus.length > 0 ? { focus: pickedFocus } : {})
   };
 
   const questActivity = completedQuests.map((quest) => ({
@@ -314,7 +511,9 @@ export const applyWorkoutToProgress = (
       id: createId('activity-workout'),
       type: 'workout' as const,
       title: `${workout.title} completed`,
-      description: `${INTENSITY_CONFIG[intensity].label} session earned +${result.xpGained} XP.`,
+      description: `${
+        pickedFocus.length > 0 ? `${describeWorkoutFocus(workoutType, pickedFocus)}. ` : ''
+      }${INTENSITY_CONFIG[intensity].label} session earned +${result.xpGained} XP.`,
       createdAt: completedAt,
       accentColor: workout.accentColor
     }

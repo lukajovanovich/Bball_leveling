@@ -10,6 +10,8 @@ import {
   calculateOvr,
   calculateWorkoutResult,
   clampAttribute,
+  describeWorkoutFocus,
+  formatWorkoutName,
   getCategoryAverage,
   getDailyWorkoutStatus,
   getLevelInfo,
@@ -127,7 +129,7 @@ describe('getCategoryAverage', () => {
 
   it('averages only the attributes of that category', () => {
     const attributes = attributesWith(
-      { midRangeShot: 60, threePointShot: 70, freeThrow: 80 },
+      { midRangeShot: 60, threePointShot: 70, freeThrow: 80, fadeaway: 70 },
       10
     );
 
@@ -138,10 +140,11 @@ describe('getCategoryAverage', () => {
     const attributes = attributesWith({
       midRangeShot: 1,
       threePointShot: 1,
-      freeThrow: 0
+      freeThrow: 0,
+      fadeaway: 1
     });
 
-    // 2 / 3 = 0.67 -> 1
+    // 3 / 4 = 0.75 -> 1
     expect(getCategoryAverage(attributes, shooting)).toBe(1);
   });
 });
@@ -207,7 +210,7 @@ describe('calculateWorkoutResult', () => {
   });
 
   it('gives +1 to every targeted attribute on a light workout', () => {
-    WORKOUTS.forEach((workout) => {
+    WORKOUTS.filter((workout) => !workout.spreadGains).forEach((workout) => {
       const { attributeGains } = calculateWorkoutResult(
         workout.type,
         'light',
@@ -232,6 +235,7 @@ describe('calculateWorkoutResult', () => {
       midRangeShot: 3,
       threePointShot: 3,
       freeThrow: 2,
+      fadeaway: 1,
       closeShot: 1
     });
   });
@@ -750,8 +754,8 @@ describe('daily workout limit', () => {
     ];
     const status = getDailyWorkoutStatus(sessions, now);
 
-    // 7 types once each plus the one bonus repeat
-    expect(status.sessionsToday).toBe(8);
+    // 8 types once each plus the one bonus repeat
+    expect(status.sessionsToday).toBe(9);
     expect(status.bonusLeft).toBe(0);
     WORKOUTS.forEach((workout) => {
       expect(getWorkoutAvailability(status, workout.type)).toBe('locked');
@@ -798,5 +802,260 @@ describe('daily workout limit', () => {
     const broken = { ...session('shooting', at(26, 8)), completedAt: 'not a date' };
 
     expect(getDailyWorkoutStatus([broken], at(26, 9)).sessionsToday).toBe(0);
+  });
+});
+
+describe('focus areas', () => {
+  const total = (gains: Partial<Record<AttributeKey, number>>) =>
+    Object.values(gains).reduce((sum, gain) => sum + (gain ?? 0), 0);
+
+  // Every non-empty combination of a workout's focus ids.
+  const focusCombinations = (ids: string[]) =>
+    Array.from({ length: 2 ** ids.length - 1 }, (_, index) =>
+      ids.filter((__, bit) => (index + 1) & (1 << bit))
+    );
+
+  it('only raises perimeter defense when that is all the player worked on', () => {
+    const { attributeGains } = calculateWorkoutResult(
+      'defense',
+      'hard',
+      attributesWith(),
+      ['perimeter']
+    );
+
+    expect(attributeGains).toEqual({ perimeterDefense: 4 });
+    expect(attributeGains).not.toHaveProperty('interiorDefense');
+    expect(attributeGains).not.toHaveProperty('block');
+    expect(attributeGains).not.toHaveProperty('steal');
+  });
+
+  it('puts more into a focused rating than a general session does', () => {
+    const general = calculateWorkoutResult('defense', 'hard', attributesWith());
+    const focused = calculateWorkoutResult('defense', 'hard', attributesWith(), [
+      'perimeter'
+    ]);
+
+    expect(focused.attributeGains.perimeterDefense).toBeGreaterThan(
+      general.attributeGains.perimeterDefense!
+    );
+  });
+
+  it('keeps the general session unchanged when no focus is picked', () => {
+    const general = calculateWorkoutResult('defense', 'hard', attributesWith());
+
+    expect(general.attributeGains).toEqual({
+      interiorDefense: 2,
+      perimeterDefense: 3,
+      steal: 2,
+      block: 1
+    });
+    expect(
+      calculateWorkoutResult('defense', 'hard', attributesWith(), []).attributeGains
+    ).toEqual(general.attributeGains);
+    // ids that belong to another workout (or to nothing) are ignored
+    expect(
+      calculateWorkoutResult('defense', 'hard', attributesWith(), ['threePointers', 'x'])
+        .attributeGains
+    ).toEqual(general.attributeGains);
+  });
+
+  it('splits gains across several picked focus areas', () => {
+    const { attributeGains } = calculateWorkoutResult(
+      'shooting',
+      'medium',
+      attributesWith(),
+      ['threePointers', 'offDribble']
+    );
+
+    expect(attributeGains).toEqual({
+      threePointShot: 3,
+      fadeaway: 3,
+      midRangeShot: 1
+    });
+  });
+
+  it('never gives more in total than the general session, and only to focus ratings', () => {
+    WORKOUTS.filter((workout) => workout.focusOptions.length > 0).forEach((workout) => {
+      const combos = focusCombinations(workout.focusOptions.map((option) => option.id));
+
+      [0, 40, 79, 82, 90, 98].forEach((base) => {
+        const attributes = attributesWith({}, base);
+
+        INTENSITIES.forEach((intensity) => {
+          const general = calculateWorkoutResult(workout.type, intensity, attributes);
+
+          combos.forEach((focus) => {
+            const focusKeys = workout.focusOptions
+              .filter((option) => focus.includes(option.id))
+              .flatMap((option) => option.effects.map((effect) => effect.attribute));
+            const { attributeGains } = calculateWorkoutResult(
+              workout.type,
+              intensity,
+              attributes,
+              focus
+            );
+
+            expect(total(attributeGains)).toBeLessThanOrEqual(
+              total(general.attributeGains)
+            );
+            expect(total(attributeGains)).toBeGreaterThan(0);
+            Object.keys(attributeGains).forEach((key) => {
+              expect(focusKeys).toContain(key);
+            });
+          });
+        });
+      });
+    });
+  });
+
+  it('trims a session with every focus picked down to the general total', () => {
+    const { attributeGains } = calculateWorkoutResult(
+      'shooting',
+      'hard',
+      attributesWith(),
+      ['midRange', 'threePointers', 'freeThrows', 'catchAndShoot', 'offDribble']
+    );
+
+    // the general hard shooting session gives 3 + 3 + 2 + 1 + 1
+    expect(total(attributeGains)).toBe(10);
+    (['midRangeShot', 'threePointShot', 'freeThrow', 'fadeaway'] as AttributeKey[]).forEach(
+      (key) => {
+        expect(attributeGains[key]).toBeGreaterThan(0);
+      }
+    );
+  });
+
+  it('still slows focused gains down near the cap', () => {
+    const { attributeGains } = calculateWorkoutResult(
+      'defense',
+      'hard',
+      attributesWith({ perimeterDefense: 90 }),
+      ['perimeter']
+    );
+
+    expect(attributeGains).toEqual({ perimeterDefense: 1 });
+  });
+
+  it('stores the picked focus on the session in definition order', () => {
+    const update = applyWorkoutToProgress(newPlayerState(), 'shooting', 'medium', [
+      'offDribble',
+      'unknown',
+      'threePointers'
+    ]);
+
+    expect(update.session.focus).toEqual(['threePointers', 'offDribble']);
+    expect(update.state.trainingSessions[0].focus).toEqual([
+      'threePointers',
+      'offDribble'
+    ]);
+  });
+
+  it('leaves focus out of a general session', () => {
+    const update = applyWorkoutToProgress(newPlayerState(), 'shooting', 'medium');
+
+    expect(update.session).not.toHaveProperty('focus');
+  });
+
+  it('names the focus in the activity log', () => {
+    const update = applyWorkoutToProgress(newPlayerState(), 'shooting', 'medium', [
+      'threePointers',
+      'offDribble'
+    ]);
+    const workoutItem = update.state.activityLog.find((item) => item.type === 'workout');
+
+    expect(workoutItem).toMatchObject({
+      title: 'Shooting Workout completed',
+      description:
+        'Three-pointers, off the dribble / fadeaways. Medium session earned +120 XP.'
+    });
+  });
+
+  it('formats a workout name with its focus', () => {
+    expect(formatWorkoutName('shooting', ['threePointers', 'offDribble'])).toBe(
+      'Shooting Workout: three-pointers, off the dribble / fadeaways'
+    );
+    expect(formatWorkoutName('defense', undefined)).toBe('Defense Workout');
+    expect(formatWorkoutName('defense', [])).toBe('Defense Workout');
+    expect(describeWorkoutFocus('defense', ['perimeter'])).toBe('Perimeter defense');
+  });
+});
+
+describe('pickup game', () => {
+  const game = getWorkoutDefinition('game');
+  const categoryOf = (key: string) =>
+    ATTRIBUTE_CATEGORIES.find((category) =>
+      category.attributes.some((attribute) => attribute.key === key)
+    )!.id;
+
+  it('raises at least one rating in every category at every intensity', () => {
+    INTENSITIES.forEach((intensity) => {
+      const { attributeGains } = calculateWorkoutResult(
+        'game',
+        intensity,
+        samplePlayer.attributes
+      );
+      const touched = new Set(Object.keys(attributeGains).map(categoryOf));
+
+      expect([...touched].sort()).toEqual(
+        ATTRIBUTE_CATEGORIES.map((category) => category.id).sort()
+      );
+      expect(Object.keys(attributeGains)).toHaveLength(game.spreadGains![intensity]);
+    });
+  });
+
+  it('moves each rating by only +1', () => {
+    INTENSITIES.forEach((intensity) => {
+      const { attributeGains } = calculateWorkoutResult(
+        'game',
+        intensity,
+        attributesWith()
+      );
+
+      Object.values(attributeGains).forEach((gain) => expect(gain).toBe(1));
+    });
+  });
+
+  it('hands out 6, 8 and 10 points by intensity', () => {
+    expect(game.spreadGains).toEqual({ light: 6, medium: 8, hard: 10 });
+  });
+
+  it('works on the weakest rating in each category first', () => {
+    const { attributeGains } = calculateWorkoutResult(
+      'game',
+      'light',
+      attributesWith({ block: 10, offensiveRebound: 12 }, 50)
+    );
+
+    expect(attributeGains.block).toBe(1);
+    expect(attributeGains.offensiveRebound).toBe(1);
+    expect(attributeGains).not.toHaveProperty('steal');
+  });
+
+  it('skips capped ratings and gives nothing when everything is 99', () => {
+    const { attributeGains } = calculateWorkoutResult(
+      'game',
+      'hard',
+      attributesWith({ speed: 99 }, 98)
+    );
+
+    expect(attributeGains).not.toHaveProperty('speed');
+    expect(
+      calculateWorkoutResult('game', 'hard', attributesWith({}, 99)).attributeGains
+    ).toEqual({});
+  });
+
+  it('counts toward the daily limit like any workout', () => {
+    const first = applyWorkoutToProgress(newPlayerState(), 'game', 'medium');
+    const once = getDailyWorkoutStatus(first.state.trainingSessions);
+
+    expect(once.loggedTypes).toEqual(['game']);
+    expect(getWorkoutAvailability(once, 'game')).toBe('bonus');
+    expect(getWorkoutAvailability(once, 'shooting')).toBe('available');
+
+    const second = applyWorkoutToProgress(first.state, 'game', 'medium');
+    const twice = getDailyWorkoutStatus(second.state.trainingSessions);
+
+    expect(twice.bonusLeft).toBe(0);
+    expect(getWorkoutAvailability(twice, 'game')).toBe('locked');
   });
 });

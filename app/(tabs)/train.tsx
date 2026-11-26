@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ATTRIBUTE_NAME_BY_KEY } from '../../src/data/attributes';
 import { WORKOUTS } from '../../src/data/workouts';
+import { FocusPicker } from '../../src/components/training/FocusPicker';
 import { TrainingTypeCard } from '../../src/components/training/TrainingTypeCard';
 import { PrimaryButton } from '../../src/components/ui/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
@@ -10,6 +11,7 @@ import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
 import {
   INTENSITY_CONFIG,
+  formatWorkoutName,
   getDailyWorkoutStatus,
   getWorkoutAvailability,
   getWorkoutDefinition
@@ -28,6 +30,7 @@ const intensityOptions: WorkoutIntensity[] = ['light', 'medium', 'hard'];
 export default function TrainScreen() {
   const { logWorkout, ovr, levelInfo, state } = useProgress();
   const [selectedType, setSelectedType] = useState<WorkoutType>('shooting');
+  const [focus, setFocus] = useState<string[]>([]);
   const [intensity, setIntensity] = useState<WorkoutIntensity>('medium');
   const [lastResult, setLastResult] = useState<ProgressUpdate | null>(null);
 
@@ -58,8 +61,21 @@ export default function TrainScreen() {
         ? `Log ${intensityLabel} workout with bonus`
         : `${selectedWorkout.title} done for today`;
 
+  const selectType = (type: WorkoutType) => {
+    if (type !== selectedType) {
+      setSelectedType(type);
+      // Focus ids belong to one workout; a new pick starts as a full session.
+      setFocus([]);
+    }
+  };
+
+  const toggleFocus = (id: string) =>
+    setFocus((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+
   const handleLogWorkout = () => {
-    const update = logWorkout(selectedType, intensity);
+    const update = logWorkout(selectedType, intensity, focus);
 
     if (update) {
       setLastResult(update);
@@ -94,15 +110,30 @@ export default function TrainScreen() {
           subtitle="Each workout counts once a day. One bonus a day lets you repeat any of them."
         />
         <View style={styles.stack}>
-          {WORKOUTS.map((workout) => (
-            <TrainingTypeCard
-              key={workout.type}
-              workout={workout}
-              selected={workout.type === selectedType}
-              availability={availabilityOf(workout.type)}
-              onPress={() => setSelectedType(workout.type)}
-            />
-          ))}
+          {WORKOUTS.map((workout) => {
+            const selected = workout.type === selectedType;
+            const availability = availabilityOf(workout.type);
+
+            return (
+              <React.Fragment key={workout.type}>
+                <TrainingTypeCard
+                  workout={workout}
+                  selected={selected}
+                  availability={availability}
+                  onPress={() => selectType(workout.type)}
+                />
+                {selected &&
+                availability !== 'locked' &&
+                workout.focusOptions.length > 0 ? (
+                  <FocusPicker
+                    options={workout.focusOptions}
+                    selected={focus}
+                    onToggle={toggleFocus}
+                  />
+                ) : null}
+              </React.Fragment>
+            );
+          })}
         </View>
       </View>
 
@@ -150,6 +181,9 @@ export default function TrainScreen() {
               +{lastResult.workoutXpGained + lastResult.questXpGained} XP
             </Text>
           </View>
+          <Text style={styles.resultWorkout}>
+            {formatWorkoutName(lastResult.session.workoutType, lastResult.session.focus)}
+          </Text>
           <View style={styles.summaryRow}>
             <StatPill
               label="Workout XP"
@@ -254,6 +288,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontFamily: fonts.display,
     fontSize: 22
+  },
+  resultWorkout: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: -spacing.sm
   },
   resultXp: {
     color: colors.gold,

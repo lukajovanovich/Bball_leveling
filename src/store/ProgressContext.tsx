@@ -57,7 +57,9 @@ interface ProgressContextValue {
   /** Returns null, and changes nothing, when today's limit blocks this workout. */
   logWorkout: (
     workoutType: WorkoutType,
-    intensity: WorkoutIntensity
+    intensity: WorkoutIntensity,
+    /** Focus option ids; leave out for a general session. */
+    focus?: readonly string[]
   ) => ProgressUpdate | null;
   updateProfile: (profile: Partial<EditableProfileFields>) => void;
   createNewProfile: (profile: EditableProfileFields) => void;
@@ -218,14 +220,14 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
   }, [isAuthLoading, isConfigured, user]);
 
   const logWorkout = useCallback(
-    (workoutType: WorkoutType, intensity: WorkoutIntensity) => {
+    (workoutType: WorkoutType, intensity: WorkoutIntensity, focus?: readonly string[]) => {
       const status = getDailyWorkoutStatus(state.trainingSessions);
 
       if (getWorkoutAvailability(status, workoutType) === 'locked') {
         return null;
       }
 
-      const update = applyWorkoutToProgress(state, workoutType, intensity);
+      const update = applyWorkoutToProgress(state, workoutType, intensity, focus);
       setState(update.state);
       void persistProgressState(update.state);
       return update;

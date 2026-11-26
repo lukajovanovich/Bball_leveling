@@ -15,6 +15,7 @@ export type AttributeKey =
   | 'midRangeShot'
   | 'threePointShot'
   | 'freeThrow'
+  | 'fadeaway'
   | 'passAccuracy'
   | 'ballHandle'
   | 'speedWithBall'
@@ -71,13 +72,22 @@ export type WorkoutType =
   | 'defense'
   | 'rebounding'
   | 'athletic'
-  | 'strength';
+  | 'strength'
+  | 'game';
 
 export type WorkoutIntensity = 'light' | 'medium' | 'hard';
 
 export interface WorkoutEffect {
   attribute: AttributeKey;
   weight: number;
+}
+
+/** One thing a player can say they worked on inside a workout, e.g. three-pointers. */
+export interface WorkoutFocusOption {
+  id: string;
+  label: string;
+  /** Attributes this focus trains; always a subset of the workout's effects. */
+  effects: WorkoutEffect[];
 }
 
 export interface WorkoutDefinition {
@@ -87,6 +97,13 @@ export interface WorkoutDefinition {
   accentColor: string;
   icon: string;
   effects: WorkoutEffect[];
+  /** Empty when the workout has nothing to narrow down (a game). */
+  focusOptions: WorkoutFocusOption[];
+  /**
+   * When set, the session does not use effect weights: it hands out this many
+   * +1 gains spread over every category (see calculateWorkoutResult).
+   */
+  spreadGains?: Record<WorkoutIntensity, number>;
 }
 
 export interface TrainingSession {
@@ -97,6 +114,8 @@ export interface TrainingSession {
   questXpGained: number;
   attributeGains: Partial<Record<AttributeKey, number>>;
   completedAt: string;
+  /** Focus option ids picked for this session; missing or empty = general session. */
+  focus?: string[];
 }
 
 export type QuestPeriod = 'daily' | 'weekly';

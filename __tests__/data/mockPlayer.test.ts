@@ -15,16 +15,16 @@ import {
   DEFAULT_WINGSPAN_CM
 } from '../../src/lib/measurements';
 import { calculateOvr, getLevelInfo } from '../../src/lib/progression';
-import { PlayerProfile, ProgressState } from '../../src/types';
+import { PlayerProfile, ProgressState, TrainingSession } from '../../src/types';
 import { signupProfile } from '../helpers/fixtures';
 
 type LooseProfile = Parameters<typeof normalizePlayerProfile>[0];
 
 describe('createZeroAttributes', () => {
-  it('starts all 22 attributes at zero', () => {
+  it('starts all 23 attributes at zero', () => {
     const attributes = createZeroAttributes();
 
-    expect(Object.keys(attributes)).toHaveLength(22);
+    expect(Object.keys(attributes)).toHaveLength(23);
     Object.values(attributes).forEach((value) => expect(value).toBe(0));
   });
 
@@ -170,7 +170,7 @@ describe('normalizePlayerProfile', () => {
     expect(player.attributes.steal).toBe(0);
     expect(player.attributes.closeShot).toBe(0);
     expect(player.attributes).not.toHaveProperty('dunkPower');
-    expect(Object.keys(player.attributes)).toHaveLength(22);
+    expect(Object.keys(player.attributes)).toHaveLength(23);
   });
 
   it('clamps stored attributes into the 0-99 range', () => {
@@ -197,13 +197,52 @@ describe('normalizePlayerProfile', () => {
     expect(calculateOvr(player.attributes)).toBe(0);
     expect(getLevelInfo(player.totalXp).level).toBe(1);
   });
+
+  describe('fadeaway on rows saved before it existed', () => {
+    const { fadeaway: _fadeaway, ...oldAttributes } = samplePlayer.attributes;
+
+    it('starts at the average of mid-range and three-point shot', () => {
+      const player = normalizePlayerProfile({
+        attributes: {
+          ...oldAttributes,
+          midRangeShot: 70,
+          threePointShot: 65
+        } as PlayerProfile['attributes']
+      });
+
+      // (70 + 65) / 2 = 67.5 -> 68
+      expect(player.attributes.fadeaway).toBe(68);
+    });
+
+    it('keeps the old player close to their old OVR', () => {
+      const oldShootingOnly = normalizePlayerProfile({
+        attributes: oldAttributes as PlayerProfile['attributes']
+      });
+
+      expect(calculateOvr(oldShootingOnly.attributes)).toBe(
+        calculateOvr(samplePlayer.attributes)
+      );
+    });
+
+    it('keeps a saved fadeaway, even 0', () => {
+      const saved = normalizePlayerProfile({
+        attributes: { ...samplePlayer.attributes, fadeaway: 41 }
+      });
+      const rookie = normalizePlayerProfile({
+        attributes: { ...samplePlayer.attributes, fadeaway: 0 }
+      });
+
+      expect(saved.attributes.fadeaway).toBe(41);
+      expect(rookie.attributes.fadeaway).toBe(0);
+    });
+  });
 });
 
 describe('samplePlayer', () => {
   it('is a complete, valid guest profile', () => {
     expect(samplePlayer.name).toBe('Jalen Novak');
     expect(samplePlayer.totalXp).toBe(840);
-    expect(Object.keys(samplePlayer.attributes)).toHaveLength(22);
+    expect(Object.keys(samplePlayer.attributes)).toHaveLength(23);
     Object.values(samplePlayer.attributes).forEach((value) => {
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThanOrEqual(99);
@@ -328,6 +367,50 @@ describe('normalizeProgressState', () => {
       progress: 1,
       completed: true,
       claimed: true
+    });
+  });
+
+  describe('training sessions', () => {
+    const oldSession: TrainingSession = {
+      id: 'session-old',
+      workoutType: 'defense',
+      intensity: 'hard',
+      xpGained: 190,
+      questXpGained: 0,
+      attributeGains: { perimeterDefense: 3 },
+      completedAt: '2026-04-22T18:30:00.000Z'
+    };
+    const withSessions = (sessions: unknown[]) =>
+      ({
+        ...createProgressStateFromPlayer(buildNewPlayerProfile(signupProfile)),
+        trainingSessions: sessions
+      }) as ProgressState;
+
+    it('loads sessions saved before focus areas existed as general sessions', () => {
+      const [session] = normalizeProgressState(withSessions([oldSession])).trainingSessions;
+
+      expect(session).toEqual(oldSession);
+      expect(session).not.toHaveProperty('focus');
+    });
+
+    it('keeps a saved focus', () => {
+      const [session] = normalizeProgressState(
+        withSessions([{ ...oldSession, focus: ['perimeter'] }])
+      ).trainingSessions;
+
+      expect(session.focus).toEqual(['perimeter']);
+    });
+
+    it('drops a focus that is not a list of ids', () => {
+      const [broken, mixed] = normalizeProgressState(
+        withSessions([
+          { ...oldSession, focus: 'perimeter' },
+          { ...oldSession, focus: [3, 'steals', null] }
+        ])
+      ).trainingSessions;
+
+      expect(broken).not.toHaveProperty('focus');
+      expect(mixed.focus).toEqual(['steals']);
     });
   });
 });

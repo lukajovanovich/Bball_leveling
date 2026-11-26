@@ -137,7 +137,7 @@ describe('Build (attributes) screen', () => {
     Object.values(ATTRIBUTE_NAME_BY_KEY).forEach((name) => {
       expect(screen.getByText(name)).toBeOnTheScreen();
     });
-    expect(screen.getAllByTestId('attribute-bar-fill')).toHaveLength(22);
+    expect(screen.getAllByTestId('attribute-bar-fill')).toHaveLength(23);
   });
 
   it('shows OVR, level, XP and archetype', async () => {
@@ -207,6 +207,7 @@ describe('Train screen', () => {
     expect(screen.getByText('Mid-Range Shot')).toBeOnTheScreen();
     expect(screen.getByText('Three-Point Shot')).toBeOnTheScreen();
     expect(screen.getByText('Free Throw')).toBeOnTheScreen();
+    expect(screen.getByText('Fadeaway')).toBeOnTheScreen();
     expect(screen.getByText('Close Shot')).toBeOnTheScreen();
     expect(screen.getByText('Quest completed')).toBeOnTheScreen();
     expect(screen.getByText('Complete 1 workout')).toBeOnTheScreen();
@@ -350,6 +351,106 @@ describe('Train screen daily limit', () => {
     // Defense is now done and there is no bonus left to repeat it
     expect(
       screen.getByRole('button', { name: 'Defense Workout done for today' })
+    ).toBeDisabled();
+  });
+});
+
+describe('Train screen focus areas', () => {
+  it('shows the focus areas of the selected workout only, none picked', async () => {
+    await renderApp(<TrainScreen />);
+
+    expect(screen.getByRole('checkbox', { name: 'Three-pointers' })).not.toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Off the dribble / fadeaways' })
+    ).toBeOnTheScreen();
+    expect(
+      screen.queryByRole('checkbox', { name: 'Perimeter defense' })
+    ).not.toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByText('Defense Workout'));
+
+    expect(screen.getByRole('checkbox', { name: 'Perimeter defense' })).toBeOnTheScreen();
+    expect(
+      screen.queryByRole('checkbox', { name: 'Three-pointers' })
+    ).not.toBeOnTheScreen();
+  });
+
+  it('logs only what was worked on', async () => {
+    await renderApp(<TrainScreen />);
+
+    await fireEvent.press(screen.getByText('Defense Workout'));
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Perimeter defense' }));
+    expect(screen.getByRole('checkbox', { name: 'Perimeter defense' })).toBeChecked();
+    await fireEvent.press(screen.getByText('Hard'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log hard workout' }));
+
+    expect(screen.getByText('Defense Workout: perimeter defense')).toBeOnTheScreen();
+    expect(screen.getByText('Perimeter Defense')).toBeOnTheScreen();
+    expect(screen.queryByText('Interior Defense')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Block')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Steal')).not.toBeOnTheScreen();
+    expect(readProbe().sessions).toBe(1);
+  });
+
+  it('lets several focus areas be picked and unpicked', async () => {
+    await renderApp(<TrainScreen />);
+
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Three-pointers' }));
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Free throws' }));
+    await fireEvent.press(
+      screen.getByRole('checkbox', { name: 'Off the dribble / fadeaways' })
+    );
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Free throws' }));
+    expect(screen.getByRole('checkbox', { name: 'Free throws' })).not.toBeChecked();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+
+    expect(
+      screen.getByText('Shooting Workout: three-pointers, off the dribble / fadeaways')
+    ).toBeOnTheScreen();
+    expect(screen.getByText('Fadeaway')).toBeOnTheScreen();
+    expect(screen.getByText('Three-Point Shot')).toBeOnTheScreen();
+    expect(screen.queryByText('Free Throw')).not.toBeOnTheScreen();
+  });
+
+  it('clears the picked focus when another workout is selected', async () => {
+    await renderApp(<TrainScreen />);
+
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Three-pointers' }));
+    await fireEvent.press(screen.getByText('Defense Workout'));
+    await fireEvent.press(screen.getByText('Shooting Workout'));
+
+    expect(screen.getByRole('checkbox', { name: 'Three-pointers' })).not.toBeChecked();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    // a general session: the result card shows the plain title
+    expect(screen.getAllByText('Shooting Workout').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Free Throw')).toBeOnTheScreen();
+  });
+
+  it('logs a pickup game that touches every category, under the same daily limit', async () => {
+    signInWith(newPlayerState());
+    await renderApp(<TrainScreen />);
+
+    await fireEvent.press(screen.getByText('Pickup Game'));
+    expect(screen.queryByRole('checkbox')).not.toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+
+    await waitFor(() => expect(mockControls.upsert).toHaveBeenCalledTimes(1));
+    const attributes = lastSavedPlayer().attributes;
+
+    ATTRIBUTE_CATEGORIES.forEach((category) => {
+      expect(
+        category.attributes.some((attribute) => attributes[attribute.key] === 1)
+      ).toBe(true);
+    });
+    expect(screen.getByText('Done today. Your bonus can repeat it.')).toBeOnTheScreen();
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Log medium workout with bonus' })
+    );
+    expect(
+      screen.getByRole('button', { name: 'Pickup Game done for today' })
     ).toBeDisabled();
   });
 });

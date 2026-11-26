@@ -81,12 +81,17 @@ describe('AttributeCategoryCard', () => {
     await render(
       <AttributeCategoryCard
         category={shooting}
-        attributes={attributesWith({ midRangeShot: 90, threePointShot: 60, freeThrow: 30 })}
+        attributes={attributesWith({
+          midRangeShot: 90,
+          threePointShot: 60,
+          freeThrow: 30,
+          fadeaway: 60
+        })}
       />
     );
 
-    // average of 90, 60, 30 — and 60 is also one of the ratings
-    expect(screen.getAllByText('60')).toHaveLength(2);
+    // average of 90, 60, 30, 60 — and 60 is also two of the ratings
+    expect(screen.getAllByText('60')).toHaveLength(3);
   });
 });
 

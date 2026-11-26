@@ -239,6 +239,21 @@ describe('saving a signed-in player', () => {
     return renderProgress();
   };
 
+  it('saves the focus areas of a logged workout', async () => {
+    const { result } = await signedIn();
+
+    await act(async () => {
+      result.current.progress.logWorkout('defense', 'hard', ['perimeter']);
+    });
+
+    await waitFor(() => expect(mockControls.upsert).toHaveBeenCalledTimes(1));
+    const saved = savedState();
+
+    expect(saved.trainingSessions[0].focus).toEqual(['perimeter']);
+    expect(saved.player.attributes.perimeterDefense).toBe(4);
+    expect(saved.player.attributes.interiorDefense).toBe(0);
+  });
+
   it('saves every logged workout', async () => {
     const { result } = await signedIn();
 

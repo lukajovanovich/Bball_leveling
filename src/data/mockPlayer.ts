@@ -3,7 +3,8 @@ import {
   AttributeKey,
   PlayerAttributes,
   PlayerProfile,
-  ProgressState
+  ProgressState,
+  TrainingSession
 } from '../types';
 import { createInitialQuests } from './quests';
 import { colors } from '../theme/theme';
@@ -71,6 +72,15 @@ const normalizeAttributes = (
       normalizedAttributes[attributeKey] = clampAttribute(value);
     }
   });
+
+  // Fadeaway was added after players already had ratings. Starting old players
+  // at 0 would drop their Shooting average and OVR overnight, so a missing
+  // fadeaway starts at the average of their other two jump shots instead.
+  if (typeof attributes.fadeaway !== 'number' || !Number.isFinite(attributes.fadeaway)) {
+    normalizedAttributes.fadeaway = clampAttribute(
+      (normalizedAttributes.midRangeShot + normalizedAttributes.threePointShot) / 2
+    );
+  }
 
   return normalizedAttributes;
 };
@@ -159,6 +169,7 @@ export const samplePlayer: PlayerProfile = normalizePlayerProfile({
     midRangeShot: 70,
     threePointShot: 66,
     freeThrow: 74,
+    fadeaway: 68,
     passAccuracy: 63,
     ballHandle: 71,
     speedWithBall: 68,
@@ -256,6 +267,21 @@ export const createProgressStateFromPlayer = (
   };
 };
 
+// Sessions saved before focus areas existed have no `focus`; that still means
+// a general session. A focus that is not a list of ids is dropped.
+const normalizeTrainingSession = (session: TrainingSession): TrainingSession => {
+  if (session?.focus === undefined) {
+    return session;
+  }
+
+  const { focus, ...rest } = session;
+  const ids = Array.isArray(focus)
+    ? focus.filter((id): id is string => typeof id === 'string')
+    : [];
+
+  return ids.length > 0 ? { ...rest, focus: ids } : rest;
+};
+
 // Rows saved by older versions of the app (or edited by hand) can be missing
 // whole sections, so every part of the state is rebuilt with safe defaults.
 export const normalizeProgressState = (
@@ -270,7 +296,7 @@ export const normalizeProgressState = (
       ? state.quests
       : createInitialQuests(player.attributes),
     trainingSessions: Array.isArray(state?.trainingSessions)
-      ? state.trainingSessions
+      ? state.trainingSessions.map(normalizeTrainingSession)
       : [],
     activityLog: Array.isArray(state?.activityLog) ? state.activityLog : [],
     lastLevelUp: state?.lastLevelUp ?? null

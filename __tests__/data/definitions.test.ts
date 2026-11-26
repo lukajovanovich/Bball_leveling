@@ -23,6 +23,7 @@ const ALL_ATTRIBUTE_KEYS: AttributeKey[] = [
   'midRangeShot',
   'threePointShot',
   'freeThrow',
+  'fadeaway',
   'passAccuracy',
   'ballHandle',
   'speedWithBall',
@@ -46,7 +47,8 @@ const ALL_WORKOUT_TYPES: WorkoutType[] = [
   'defense',
   'rebounding',
   'athletic',
-  'strength'
+  'strength',
+  'game'
 ];
 
 describe('attribute categories', () => {
@@ -138,6 +140,63 @@ describe('workouts', () => {
     ALL_ATTRIBUTE_KEYS.forEach((key) => {
       expect(trainable.has(key)).toBe(true);
     });
+  });
+
+  it('offers focus areas for every workout except the game', () => {
+    WORKOUTS.forEach((workout) => {
+      if (workout.type === 'game') {
+        expect(workout.focusOptions).toEqual([]);
+        expect(workout.spreadGains).toBeDefined();
+      } else {
+        expect(workout.focusOptions.length).toBeGreaterThanOrEqual(3);
+        expect(workout.spreadGains).toBeUndefined();
+      }
+    });
+  });
+
+  it.each(
+    WORKOUTS.filter((workout) => workout.focusOptions.length > 0).map(
+      (workout) => [workout.type, workout] as const
+    )
+  )('%s focus areas only train attributes of that workout', (_, workout) => {
+    const workoutKeys = workout.effects.map((effect) => effect.attribute);
+    const ids = workout.focusOptions.map((option) => option.id);
+
+    expect(new Set(ids).size).toBe(ids.length);
+    workout.focusOptions.forEach((option) => {
+      // sentence case, so it reads well inside "Shooting Workout: three-pointers"
+      expect(option.label).toMatch(/^[A-Z][^A-Z]*$/);
+      expect(option.effects.length).toBeGreaterThan(0);
+      expect(option.effects.some((effect) => effect.weight === 1)).toBe(true);
+      option.effects.forEach((effect) => {
+        expect(workoutKeys).toContain(effect.attribute);
+        expect(effect.weight).toBeGreaterThan(0);
+        expect(effect.weight).toBeLessThanOrEqual(1);
+      });
+    });
+  });
+
+  it('lets shooting focus on shots off the dribble through Fadeaway', () => {
+    const shooting = WORKOUTS.find((workout) => workout.type === 'shooting')!;
+    const offDribble = shooting.focusOptions.find((option) => option.id === 'offDribble')!;
+
+    expect(offDribble.label).toBe('Off the dribble / fadeaways');
+    expect(offDribble.effects).toContainEqual({ attribute: 'fadeaway', weight: 1 });
+    expect(ATTRIBUTE_NAME_BY_KEY.fadeaway).toBe('Fadeaway');
+    expect(
+      ATTRIBUTE_CATEGORIES.find((category) => category.id === 'shooting')!.attributes.map(
+        (attribute) => attribute.key
+      )
+    ).toContain('fadeaway');
+  });
+
+  it('lets a game move every attribute', () => {
+    const game = WORKOUTS.find((workout) => workout.type === 'game')!;
+
+    expect(game.title).toBe('Pickup Game');
+    expect(game.effects.map((effect) => effect.attribute).sort()).toEqual(
+      [...ALL_ATTRIBUTE_KEYS].sort()
+    );
   });
 
   it('has a primary (weight 1) attribute in every workout', () => {

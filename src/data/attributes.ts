@@ -21,7 +21,9 @@ export const ATTRIBUTE_CATEGORIES: AttributeCategory[] = [
     attributes: [
       { key: 'midRangeShot', name: 'Mid-Range Shot' },
       { key: 'threePointShot', name: 'Three-Point Shot' },
-      { key: 'freeThrow', name: 'Free Throw' }
+      { key: 'freeThrow', name: 'Free Throw' },
+      // Shots off the move: fadeaways and pull-ups off the dribble.
+      { key: 'fadeaway', name: 'Fadeaway' }
     ]
   },
   {
