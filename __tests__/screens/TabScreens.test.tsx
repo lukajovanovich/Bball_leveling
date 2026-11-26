@@ -683,6 +683,49 @@ describe('Profile screen', () => {
     }
   });
 
+  it('keeps "Saved" for the full moment after a second save', async () => {
+    await renderApp(<ProfileScreen />);
+    jest.useFakeTimers();
+
+    try {
+      await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+      await fireEvent.press(screen.getByRole('button', { name: 'Saved' }));
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      expect(screen.getByRole('button', { name: 'Saved' })).toBeOnTheScreen();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('stops the "Saved" timer when the screen goes away', async () => {
+    await renderApp(<ProfileScreen />);
+    const setTimeoutSpy = jest.spyOn(globalThis, 'setTimeout');
+    const clearTimeoutSpy = jest.spyOn(globalThis, 'clearTimeout');
+
+    try {
+      await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
+
+      const savedTimerIndex = setTimeoutSpy.mock.calls.findIndex(
+        ([, delay]) => delay === 1600
+      );
+      expect(savedTimerIndex).toBeGreaterThanOrEqual(0);
+      const savedTimer = setTimeoutSpy.mock.results[savedTimerIndex].value;
+
+      await screen.unmount();
+
+      expect(clearTimeoutSpy).toHaveBeenCalledWith(savedTimer);
+    } finally {
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+    }
+  });
+
   it('writes edits to the cloud for a signed-in player', async () => {
     signInWith(newPlayerState({ speed: 30 }, 500));
     await renderApp(<ProfileScreen />);

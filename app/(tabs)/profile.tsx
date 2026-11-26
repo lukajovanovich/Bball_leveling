@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { MeasurementPicker } from '../../src/components/ui/MeasurementPicker';
@@ -32,6 +32,7 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { player, updateProfile, ovr, levelInfo, syncError } = useProgress();
   const [saved, setSaved] = useState(false);
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [draft, setDraft] = useState({
     name: player.name,
@@ -90,8 +91,27 @@ export default function ProfileScreen() {
     setDraft(nextDraft);
     updateProfile(nextDraft);
     setSaved(true);
-    setTimeout(() => setSaved(false), 1600);
+
+    // A second save restarts the moment instead of ending it early.
+    if (savedTimeoutRef.current) {
+      clearTimeout(savedTimeoutRef.current);
+    }
+
+    savedTimeoutRef.current = setTimeout(() => {
+      savedTimeoutRef.current = null;
+      setSaved(false);
+    }, 1600);
   };
+
+  // Leaving the screen must not leave the timer running.
+  useEffect(
+    () => () => {
+      if (savedTimeoutRef.current) {
+        clearTimeout(savedTimeoutRef.current);
+      }
+    },
+    []
+  );
 
   return (
     <ScreenContainer>
