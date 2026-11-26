@@ -617,3 +617,128 @@ describe('first Google sign-in', () => {
     expect(result.current.progress.player).toEqual(samplePlayer);
   });
 });
+
+describe('a signup profile typed for another account', () => {
+  it('is not given to a Google newcomer with a different email, and is kept', async () => {
+    savePendingSignupProfile({ ...signupProfile, name: 'Email Signup' }, 'sam@example.com');
+    mockControls.startSignedIn(makeGoogleSession('google-1', 'jordan@gmail.com'));
+    mockControls.setStoredProgress(null);
+
+    const { result } = await renderProgress();
+
+    expect(result.current.progress.needsPlayerSetup).toBe(true);
+    expect(mockControls.upsert).not.toHaveBeenCalled();
+    expect(getPendingSignupProfile('sam@example.com')?.name).toBe('Email Signup');
+  });
+
+  it('is used when Google signs in the same email that signed up', async () => {
+    savePendingSignupProfile({ ...signupProfile, name: 'Email Signup' }, 'jordan@gmail.com');
+    mockControls.startSignedIn(makeGoogleSession('google-1', 'Jordan@Gmail.com'));
+    mockControls.setStoredProgress(null);
+
+    const { result } = await renderProgress();
+
+    expect(result.current.progress.needsPlayerSetup).toBe(false);
+    expect(savedState().player.name).toBe('Email Signup');
+    expect(getPendingSignupProfile()).toBeNull();
+  });
+
+  it('is not used for the default profile of another email account', async () => {
+    savePendingSignupProfile({ ...signupProfile, name: 'Email Signup' }, 'sam@example.com');
+    mockControls.startSignedIn(makeSession('user-3', 'jalen.novak@example.com'));
+    mockControls.setStoredProgress(null);
+
+    await renderProgress();
+
+    expect(savedState().player.name).toBe('Jalen Novak');
+    expect(getPendingSignupProfile('sam@example.com')?.name).toBe('Email Signup');
+  });
+
+  it('is not deleted when another account with a cloud save signs in', async () => {
+    savePendingSignupProfile(signupProfile, 'sam@example.com');
+    mockControls.startSignedIn(makeSession('user-1', 'other@example.com'));
+    mockControls.setStoredProgress(newPlayerState());
+
+    await renderProgress();
+
+    expect(getPendingSignupProfile('sam@example.com')).toEqual(signupProfile);
+  });
+});
+
+describe('session refreshes', () => {
+  it('does not reload the player when the token refreshes', async () => {
+    mockControls.startSignedIn(makeSession('user-1', 'one@example.com'));
+    mockControls.setStoredProgress(newPlayerState());
+    const { result } = await renderProgress();
+
+    await act(async () => {
+      result.current.progress.logWorkout('shooting', 'hard');
+    });
+    await act(async () => {
+      mockControls.emitAuthChange(
+        'TOKEN_REFRESHED',
+        makeSession('user-1', 'one@example.com')
+      );
+    });
+
+    expect(mockControls.maybeSingle).toHaveBeenCalledTimes(1);
+    expect(result.current.progress.isHydrating).toBe(false);
+    expect(result.current.progress.state.trainingSessions).toHaveLength(1);
+  });
+
+  it('keeps an open player setup able to save through a token refresh', async () => {
+    mockControls.startSignedIn(makeGoogleSession('google-1', 'jordan@gmail.com'));
+    mockControls.setStoredProgress(null);
+    const { result } = await renderProgress();
+    // A reload now would fail and leave the setup unable to save.
+    mockControls.maybeSingle.mockResolvedValue({
+      data: null,
+      error: { message: 'Failed to fetch' }
+    });
+
+    await act(async () => {
+      mockControls.emitAuthChange(
+        'TOKEN_REFRESHED',
+        makeGoogleSession('google-1', 'jordan@gmail.com')
+      );
+    });
+
+    let saveError: string | null | undefined;
+
+    await act(async () => {
+      saveError = await result.current.progress.createNewProfile(signupProfile);
+    });
+
+    expect(saveError).toBeNull();
+    expect(mockControls.upsert).toHaveBeenCalledTimes(1);
+    expect(mockControls.upsert.mock.calls[0][0]).toMatchObject({ user_id: 'google-1' });
+  });
+});
+
+describe('switching accounts during the player setup', () => {
+  it('does not show the setup to the next account when its load fails', async () => {
+    mockControls.startSignedIn(makeGoogleSession('google-1', 'jordan@gmail.com'));
+    mockControls.setStoredProgress(null);
+    const { result } = await renderProgress();
+
+    expect(result.current.progress.needsPlayerSetup).toBe(true);
+
+    mockControls.maybeSingle.mockResolvedValue({
+      data: null,
+      error: { message: 'Failed to fetch' }
+    });
+    await act(async () => {
+      mockControls.emitAuthChange('SIGNED_IN', makeSession('user-b', 'b@example.com'));
+    });
+    await waitFor(() => expect(result.current.progress.isHydrating).toBe(false));
+
+    expect(result.current.progress.needsPlayerSetup).toBe(false);
+    expect(result.current.progress.syncError).toBe(NETWORK_ERROR_MESSAGE);
+
+    await act(async () => {
+      await result.current.progress.createNewProfile(signupProfile);
+    });
+
+    expect(mockControls.upsert).not.toHaveBeenCalled();
+  });
+});

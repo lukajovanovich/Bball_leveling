@@ -99,6 +99,12 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
   // Until then local state is not theirs, and saving it would overwrite their
   // real progress in the database.
   const cloudReadyUserIdRef = useRef<string | null>(null);
+  // Loading follows the account id, not the session object: a token refresh
+  // hands out a new user object for the same player, and reloading then would
+  // drop a workout whose save is still on its way.
+  const userId = user?.id ?? null;
+  const userRef = useRef(user);
+  userRef.current = user;
 
   const persistProgressState = useCallback(
     async (nextState: ProgressState): Promise<string | null> => {
@@ -132,6 +138,8 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
 
   useEffect(() => {
     let active = true;
+
+    const user = userRef.current;
 
     const finishHydrating = () => {
       setIsHydrating(false);
@@ -167,6 +175,9 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       }
 
       cloudReadyUserIdRef.current = null;
+      // A setup still open for the previous account is not this one's.
+      needsPlayerSetupRef.current = false;
+      setNeedsPlayerSetup(false);
 
       if (active) {
         setIsHydrating(true);
@@ -201,15 +212,19 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       needsPlayerSetupRef.current = false;
       setNeedsPlayerSetup(false);
 
+      // Only a profile typed for this account is used (and then removed).
+      const pendingProfile = getPendingSignupProfile(user.email ?? null);
+
       if (data) {
-        clearPendingSignupProfile();
+        if (pendingProfile) {
+          clearPendingSignupProfile();
+        }
+
         setState(data);
         setSyncError(null);
         finishHydrating();
         return;
       }
-
-      const pendingProfile = getPendingSignupProfile();
 
       // The row is known to be missing, so creating it is safe, but only the
       // player can say how tall they are: wait for the setup form.
@@ -251,7 +266,10 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       if (createErrorMessage) {
         setSyncError(createErrorMessage);
       } else {
-        clearPendingSignupProfile();
+        if (pendingProfile) {
+          clearPendingSignupProfile();
+        }
+
         setSyncError(null);
       }
 
@@ -263,7 +281,7 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
     return () => {
       active = false;
     };
-  }, [isAuthLoading, isConfigured, user]);
+  }, [isAuthLoading, isConfigured, userId]);
 
   const logWorkout = useCallback(
     (workoutType: WorkoutType, intensity: WorkoutIntensity, focus?: readonly string[]) => {

@@ -32,6 +32,36 @@ describe('pending signup profile', () => {
     expect(getPendingSignupProfile()).toBeNull();
   });
 
+  it('is only handed to the account it was typed for', () => {
+    savePendingSignupProfile(signupProfile, ' Sam@Example.com ');
+
+    expect(getPendingSignupProfile('sam@example.com')).toEqual(signupProfile);
+    expect(getPendingSignupProfile('SAM@example.com')).toEqual(signupProfile);
+    expect(getPendingSignupProfile('other@example.com')).toBeNull();
+    expect(getPendingSignupProfile(null)).toBeNull();
+    // Without an account to compare with, it is still readable.
+    expect(getPendingSignupProfile()).toEqual(signupProfile);
+  });
+
+  it('treats a profile saved without an email (older versions) as anyone\'s', () => {
+    savePendingSignupProfile(signupProfile);
+
+    expect(getPendingSignupProfile('anyone@example.com')).toEqual(signupProfile);
+  });
+
+  it('forgets the account when a later profile is saved without one, or on clear', () => {
+    savePendingSignupProfile(signupProfile, 'sam@example.com');
+    savePendingSignupProfile(signupProfile);
+
+    expect(getPendingSignupProfile('other@example.com')).toEqual(signupProfile);
+
+    savePendingSignupProfile(signupProfile, 'sam@example.com');
+    clearPendingSignupProfile();
+    savePendingSignupProfile(signupProfile);
+
+    expect(getPendingSignupProfile('other@example.com')).toEqual(signupProfile);
+  });
+
   it('clearing when nothing is stored does not throw', () => {
     expect(() => clearPendingSignupProfile()).not.toThrow();
   });

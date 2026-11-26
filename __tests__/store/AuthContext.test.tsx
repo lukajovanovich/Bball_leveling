@@ -282,6 +282,21 @@ describe('signUp', () => {
     expect(getPendingSignupProfile()).toEqual(signupProfile);
   });
 
+  it('keeps the profile for the account that signed up only', async () => {
+    supabase.auth.signUp.mockResolvedValue({
+      data: { user, session: null },
+      error: null
+    });
+    const { result } = await renderAuth();
+
+    await act(async () => {
+      await result.current.signUp(' New@Example.com ', 'secret1', signupProfile);
+    });
+
+    expect(getPendingSignupProfile('new@example.com')).toEqual(signupProfile);
+    expect(getPendingSignupProfile('someone.else@gmail.com')).toBeNull();
+  });
+
   it('returns the server message and forgets the profile when signup is rejected', async () => {
     supabase.auth.signUp.mockResolvedValue({
       data: { user: null, session: null },

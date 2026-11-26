@@ -237,7 +237,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
       // Saved before the request: signing up fires the auth listener, and the
       // progress loader that reacts to it must already find this profile.
-      savePendingSignupProfile(profile);
+      savePendingSignupProfile(profile, normalizedEmail);
 
       try {
         const {
