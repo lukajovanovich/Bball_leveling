@@ -23,7 +23,8 @@ import {
   normalizeWeightUnit,
   parseLengthMeasurement,
   parseWeightMeasurement,
-  poundsToKg
+  poundsToKg,
+  unitsForSystemOf
 } from '../../src/lib/measurements';
 
 describe('unit conversion', () => {
@@ -291,5 +292,23 @@ describe('createDefaultMeasurements', () => {
 
   it('returns a fresh object each time', () => {
     expect(createDefaultMeasurements()).not.toBe(createDefaultMeasurements());
+  });
+});
+
+describe('unitsForSystemOf', () => {
+  it.each(['cm', 'kg'] as const)('maps %s to metric for all three fields', (unit) => {
+    expect(unitsForSystemOf(unit)).toEqual({
+      heightUnit: 'cm',
+      wingspanUnit: 'cm',
+      weightUnit: 'kg'
+    });
+  });
+
+  it.each(['in', 'lb'] as const)('maps %s to imperial for all three fields', (unit) => {
+    expect(unitsForSystemOf(unit)).toEqual({
+      heightUnit: 'in',
+      wingspanUnit: 'in',
+      weightUnit: 'lb'
+    });
   });
 });

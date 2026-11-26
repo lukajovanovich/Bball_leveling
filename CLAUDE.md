@@ -80,8 +80,8 @@ UI work follows the `frontend-design` skill in `.claude/skills/`. For this app t
 ## Git workflow
 
 - Remote: https://github.com/lukajovanovich/Bball_leveling
-- `dev` is the working branch: all work is committed and pushed there.
+- `dev` is the working branch: all work is committed and pushed there. Once typecheck and tests pass, finished work may be committed and pushed to `dev` without asking; the owner tests it there (Vercel preview of `dev`, or locally) before it goes to `main`.
 - `main` is the stable branch: it only receives changes from `dev` after the owner confirms everything works. Never commit or push directly to `main`, and never merge into it without being asked.
-- Commit, push and merge only when the owner asks.
+- Merging into `main` happens only when the owner asks.
 - **No AI attribution anywhere**: no `Co-Authored-By` lines, no "Generated with Claude Code" footers, no mention of Claude or AI in commit messages, PR descriptions, code comments or docs. The owner is the sole author.
 - Short imperative English commit messages.

@@ -253,3 +253,16 @@ export const createDefaultMeasurements = () => ({
   weightKg: DEFAULT_WEIGHT_KG,
   weightUnit: 'kg' as const
 });
+
+export interface MeasurementUnits {
+  heightUnit: LengthUnit;
+  wingspanUnit: LengthUnit;
+  weightUnit: WeightUnit;
+}
+
+// Height, wingspan and weight always share one system: picking cm or kg on any
+// of them switches all three to metric, ft/in or lb switches all to imperial.
+export const unitsForSystemOf = (unit: LengthUnit | WeightUnit): MeasurementUnits =>
+  unit === 'cm' || unit === 'kg'
+    ? { heightUnit: 'cm', wingspanUnit: 'cm', weightUnit: 'kg' }
+    : { heightUnit: 'in', wingspanUnit: 'in', weightUnit: 'lb' };

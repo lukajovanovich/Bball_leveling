@@ -29,7 +29,8 @@ import {
   buildWeightOptions,
   createDefaultMeasurements,
   formatLengthMeasurement,
-  formatWeightMeasurement
+  formatWeightMeasurement,
+  unitsForSystemOf
 } from '../src/lib/measurements';
 import { formatNameFromEmail } from '../src/lib/playerIdentity';
 import { useAuth } from '../src/store/AuthContext';
@@ -106,6 +107,10 @@ export default function LoginScreen() {
       ...current,
       [key]: value
     }));
+  };
+
+  const setUnitSystem = (unit: LengthUnit | WeightUnit) => {
+    setSignupDraft((current) => ({ ...current, ...unitsForSystemOf(unit) }));
   };
 
   const switchMode = (nextMode: AuthMode) => {
@@ -296,9 +301,7 @@ export default function LoginScreen() {
                     <MeasurementPicker
                       helperText="Switch units, then scroll to your height."
                       label="Height"
-                      onUnitChange={(value) =>
-                        setSignupField('heightUnit', value as LengthUnit)
-                      }
+                      onUnitChange={(value) => setUnitSystem(value as LengthUnit)}
                       onValueChange={(value) => setSignupField('heightCm', value)}
                       options={heightOptions}
                       selectedUnit={signupDraft.heightUnit}
@@ -313,9 +316,7 @@ export default function LoginScreen() {
                     <MeasurementPicker
                       helperText="Fingertip to fingertip with your arms out."
                       label="Wingspan"
-                      onUnitChange={(value) =>
-                        setSignupField('wingspanUnit', value as LengthUnit)
-                      }
+                      onUnitChange={(value) => setUnitSystem(value as LengthUnit)}
                       onValueChange={(value) => setSignupField('wingspanCm', value)}
                       options={wingspanOptions}
                       selectedUnit={signupDraft.wingspanUnit}
@@ -330,9 +331,7 @@ export default function LoginScreen() {
                     <MeasurementPicker
                       helperText="Your current body weight."
                       label="Weight"
-                      onUnitChange={(value) =>
-                        setSignupField('weightUnit', value as WeightUnit)
-                      }
+                      onUnitChange={(value) => setUnitSystem(value as WeightUnit)}
                       onValueChange={(value) => setSignupField('weightKg', value)}
                       options={weightOptions}
                       selectedUnit={signupDraft.weightUnit}

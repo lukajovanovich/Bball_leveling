@@ -317,20 +317,17 @@ describe('sign up', () => {
     await renderApp(<LoginScreen />);
     await fillSignUp();
 
-    // height in feet and inches
+    // switching height to ft/in moves wingspan and weight to imperial too
     await fireEvent.press(screen.getAllByText('Tap to edit')[0]);
     await fireEvent.press(screen.getByText('ft/in'));
     await fireEvent.press(screen.getByText('5\'5"'));
-    // wingspan in centimeters
     await fireEvent.press(screen.getAllByText('Tap to edit')[1]);
-    await fireEvent.press(screen.getByText('162 cm'));
-    // weight in pounds
+    await fireEvent.press(screen.getByText('5\'6"'));
     await fireEvent.press(screen.getAllByText('Tap to edit')[2]);
-    await fireEvent.press(screen.getByText('lb'));
     await fireEvent.press(screen.getByText('125 lb'));
 
     expect(screen.getByText('5\'5"')).toBeOnTheScreen();
-    expect(screen.getByText('162 cm')).toBeOnTheScreen();
+    expect(screen.getByText('5\'6"')).toBeOnTheScreen();
     expect(screen.getByText('125 lb')).toBeOnTheScreen();
 
     await fireEvent.press(
@@ -341,11 +338,32 @@ describe('sign up', () => {
     expect(mockControls.upsert.mock.calls[0][0].progress_state.player).toMatchObject({
       heightCm: 165.1,
       heightUnit: 'in',
-      wingspanCm: 162,
-      wingspanUnit: 'cm',
+      wingspanCm: 167.64,
+      wingspanUnit: 'in',
       weightKg: 56.7,
       weightUnit: 'lb'
     });
+  });
+
+  it('switches all three measurements back to metric from any one of them', async () => {
+    await renderApp(<LoginScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign up' }));
+
+    // weight to lb: height and wingspan follow into ft/in
+    await fireEvent.press(screen.getAllByText('Tap to edit')[2]);
+    await fireEvent.press(screen.getByText('lb'));
+    await fireEvent.press(screen.getByText('Done'));
+    expect(screen.getByText('6\'0"')).toBeOnTheScreen();
+    expect(screen.getByText('6\'4"')).toBeOnTheScreen();
+    expect(screen.getByText('185 lb')).toBeOnTheScreen();
+
+    // wingspan to cm: height and weight follow into metric
+    await fireEvent.press(screen.getAllByText('Tap to edit')[1]);
+    await fireEvent.press(screen.getByText('cm'));
+    await fireEvent.press(screen.getByText('Done'));
+    expect(screen.getByText('183 cm')).toBeOnTheScreen();
+    expect(screen.getByText('193 cm')).toBeOnTheScreen();
+    expect(screen.getByText('84 kg')).toBeOnTheScreen();
   });
 
   it('tells the user to confirm their email when that is required', async () => {

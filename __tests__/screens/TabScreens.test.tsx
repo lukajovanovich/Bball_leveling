@@ -457,6 +457,40 @@ describe('Profile screen', () => {
     expect(screen.getByText('88 kg')).toBeOnTheScreen();
   });
 
+  it('moves height and wingspan to metric when weight switches to kg', async () => {
+    await renderApp(<ProfileScreen />);
+
+    await fireEvent.press(screen.getAllByText('Tap to edit')[2]);
+    await fireEvent.press(screen.getByText('kg'));
+    await fireEvent.press(screen.getByText('Done'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
+
+    expect(readProbe()).toMatchObject({
+      heightUnit: 'cm',
+      wingspanUnit: 'cm',
+      weightUnit: 'kg'
+    });
+  });
+
+  it('moves weight to lb and wingspan to ft/in when height switches to ft/in', async () => {
+    await renderApp(<ProfileScreen />);
+    // start from metric everywhere, set through the weight picker
+    await fireEvent.press(screen.getAllByText('Tap to edit')[2]);
+    await fireEvent.press(screen.getByText('kg'));
+    await fireEvent.press(screen.getByText('Done'));
+
+    await fireEvent.press(screen.getAllByText('Tap to edit')[0]);
+    await fireEvent.press(screen.getByText('ft/in'));
+    await fireEvent.press(screen.getByText('Done'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save profile' }));
+
+    expect(readProbe()).toMatchObject({
+      heightUnit: 'in',
+      wingspanUnit: 'in',
+      weightUnit: 'lb'
+    });
+  });
+
   it('saves a wingspan picked from the wheel', async () => {
     await renderApp(<ProfileScreen />);
 

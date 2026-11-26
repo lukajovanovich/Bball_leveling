@@ -20,7 +20,8 @@ import {
   buildLengthOptions,
   buildWeightOptions,
   formatLengthMeasurement,
-  formatWeightMeasurement
+  formatWeightMeasurement,
+  unitsForSystemOf
 } from '../../src/lib/measurements';
 import { useAuth } from '../../src/store/AuthContext';
 import { useProgress } from '../../src/store/ProgressContext';
@@ -74,6 +75,10 @@ export default function ProfileScreen() {
     player.wingspanUnit
   ]);
 
+  const setUnitSystem = (unit: LengthUnit | WeightUnit) => {
+    setDraft((current) => ({ ...current, ...unitsForSystemOf(unit) }));
+  };
+
   const handleSave = () => {
     // Blank text fields fall back to the saved value instead of being stored empty.
     const nextDraft = {
@@ -118,12 +123,7 @@ export default function ProfileScreen() {
           <MeasurementPicker
             helperText="Open the menu, scroll up or down, and save the height that fits now."
             label="Height"
-            onUnitChange={(heightUnit) =>
-              setDraft((current) => ({
-                ...current,
-                heightUnit: heightUnit as LengthUnit
-              }))
-            }
+            onUnitChange={(unit) => setUnitSystem(unit as LengthUnit)}
             onValueChange={(heightCm) =>
               setDraft((current) => ({ ...current, heightCm }))
             }
@@ -139,12 +139,7 @@ export default function ProfileScreen() {
           <MeasurementPicker
             helperText="Adjust reach whenever your build changes."
             label="Wingspan"
-            onUnitChange={(wingspanUnit) =>
-              setDraft((current) => ({
-                ...current,
-                wingspanUnit: wingspanUnit as LengthUnit
-              }))
-            }
+            onUnitChange={(unit) => setUnitSystem(unit as LengthUnit)}
             onValueChange={(wingspanCm) =>
               setDraft((current) => ({ ...current, wingspanCm }))
             }
@@ -163,12 +158,7 @@ export default function ProfileScreen() {
           <MeasurementPicker
             helperText="Update weight anytime if the player gets bigger or leaner."
             label="Weight"
-            onUnitChange={(weightUnit) =>
-              setDraft((current) => ({
-                ...current,
-                weightUnit: weightUnit as WeightUnit
-              }))
-            }
+            onUnitChange={(unit) => setUnitSystem(unit as WeightUnit)}
             onValueChange={(weightKg) =>
               setDraft((current) => ({ ...current, weightKg }))
             }
