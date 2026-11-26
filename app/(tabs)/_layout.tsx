@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/store/AuthContext';
 import { useProgress } from '../../src/store/ProgressContext';
@@ -8,9 +8,17 @@ import { colors, fonts, spacing } from '../../src/theme/theme';
 
 export default function TabsLayout() {
   const { isLoading: isAuthLoading } = useAuth();
-  const { isHydrating } = useProgress();
+  const { isHydrating, needsPlayerSetup } = useProgress();
 
-  if (isAuthLoading || isHydrating) {
+  // A Google newcomer opening a tab link directly still has to set up their
+  // player first; the tabs would only show placeholder data.
+  useEffect(() => {
+    if (needsPlayerSetup) {
+      router.replace('/');
+    }
+  }, [needsPlayerSetup]);
+
+  if (isAuthLoading || isHydrating || needsPlayerSetup) {
     return (
       <View style={styles.loadingRoot}>
         <ActivityIndicator size="large" color={colors.court} />
