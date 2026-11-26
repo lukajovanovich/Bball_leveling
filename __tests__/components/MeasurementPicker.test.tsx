@@ -124,17 +124,16 @@ describe('MeasurementPicker', () => {
     expect(screen.getAllByText('162 cm').length).toBeGreaterThan(0);
   });
 
-  it('keeps the height when switching cm to ft/in, ignoring the old scroll offset', async () => {
+  it('starts a fresh wheel on the same height when the unit changes', async () => {
     const { onValueChange } = await setup(196);
     await openPicker();
+    const cmWheel = screen.getByTestId('measurement-wheel');
 
     await fireEvent.press(screen.getByText('ft/in'));
-    // the cm wheel was scrolled to row 41 (196 cm); the shorter ft/in list
-    // reports that stale offset before it jumps to the right row
-    await fireEvent.scroll(screen.getByTestId('measurement-wheel'), {
-      nativeEvent: { contentOffset: { y: OPTION_HEIGHT * 41 } }
-    });
 
+    // a new list, so the cm wheel's scroll offset (row 41) cannot be read
+    // against the 31 ft/in rows and land on 7'7"
+    expect(screen.getByTestId('measurement-wheel')).not.toBe(cmWheel);
     expect(onValueChange).not.toHaveBeenCalled();
     expect(screen.getAllByText('6\'5"').length).toBeGreaterThan(0);
   });

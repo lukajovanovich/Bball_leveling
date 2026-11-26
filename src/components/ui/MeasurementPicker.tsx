@@ -49,52 +49,37 @@ export const MeasurementPicker = ({
   const selectedIndex = findClosestMeasurementIndex(options, selectedValue);
   const selectedIndexRef = useRef(selectedIndex);
   selectedIndexRef.current = selectedIndex;
-  // True from a unit switch until the wheel has jumped to the new list. The
-  // scroll offset still belongs to the old list then (cm has far more rows than
-  // ft/in), so reading it would pick the wrong row, usually the last one.
-  const awaitingJumpRef = useRef(false);
 
-  // Jump to the current value when the wheel opens or the unit changes. Value
-  // changes made by scrolling must not scroll the wheel again, or it would
-  // fight the finger.
+  // The wheel only scrolls itself when it opens or the unit changes. The list
+  // is keyed by unit, so a unit change mounts a fresh list at offset 0 that then
+  // jumps to the same measurement: the old list's offset (cm has far more rows
+  // than ft/in) is never read against the new rows, which used to land on the
+  // last row. Value changes made by scrolling do not move the wheel, so it does
+  // not fight the finger.
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
-    let releaseId: ReturnType<typeof setTimeout> | undefined;
-    const jumpId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       listRef.current?.scrollToIndex({
         index: selectedIndexRef.current,
         animated: false
       });
-      releaseId = setTimeout(() => {
-        awaitingJumpRef.current = false;
-      }, 100);
     }, 0);
 
-    return () => {
-      clearTimeout(jumpId);
-      clearTimeout(releaseId);
-    };
+    return () => clearTimeout(timeoutId);
   }, [isOpen, selectedUnit]);
 
   const changeUnit = (unit: string) => {
-    if (unit === selectedUnit) {
-      return;
+    if (unit !== selectedUnit) {
+      onUnitChange(unit);
     }
-
-    awaitingJumpRef.current = true;
-    onUnitChange(unit);
   };
 
   const syncSelectionFromOffset = (
     event: NativeSyntheticEvent<NativeScrollEvent>
   ) => {
-    if (awaitingJumpRef.current) {
-      return;
-    }
-
     const nextIndex = Math.max(
       0,
       Math.min(options.length - 1, Math.round(event.nativeEvent.contentOffset.y / OPTION_HEIGHT))
@@ -195,6 +180,7 @@ export const MeasurementPicker = ({
               <View pointerEvents="none" style={styles.selectionHighlight} />
 
               <FlatList
+                key={selectedUnit}
                 ref={listRef}
                 testID="measurement-wheel"
                 contentContainerStyle={styles.optionsContent}
