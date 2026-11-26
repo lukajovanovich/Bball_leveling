@@ -47,7 +47,12 @@ export const MeasurementPicker = ({
   const listRef = useRef<FlatList<MeasurementOption>>(null);
   const [isOpen, setIsOpen] = useState(false);
   const selectedIndex = findClosestMeasurementIndex(options, selectedValue);
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
 
+  // Jump to the current value when the wheel opens or the unit changes. Value
+  // changes made by scrolling must not scroll the wheel again, or it would
+  // fight the finger.
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -55,13 +60,13 @@ export const MeasurementPicker = ({
 
     const timeoutId = setTimeout(() => {
       listRef.current?.scrollToIndex({
-        index: selectedIndex,
+        index: selectedIndexRef.current,
         animated: false
       });
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [isOpen, selectedIndex, selectedUnit]);
+  }, [isOpen, selectedUnit]);
 
   const syncSelectionFromOffset = (
     event: NativeSyntheticEvent<NativeScrollEvent>
@@ -177,6 +182,11 @@ export const MeasurementPicker = ({
                   index
                 })}
                 keyExtractor={(item) => `${item.value}`}
+                // The row under the highlight is the value, updated while the
+                // wheel moves; web never fires the momentum/drag end events
+                // for mouse wheels and trackpads.
+                onScroll={syncSelectionFromOffset}
+                scrollEventThrottle={32}
                 onMomentumScrollEnd={syncSelectionFromOffset}
                 onScrollEndDrag={syncSelectionFromOffset}
                 onScrollToIndexFailed={({ index }) => {

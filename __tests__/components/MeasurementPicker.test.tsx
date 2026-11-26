@@ -106,6 +106,24 @@ describe('MeasurementPicker', () => {
     expect(screen.getByText('5\'1"')).toBeOnTheScreen();
   });
 
+  it('updates the value while scrolling, without a tap or a scroll-end event', async () => {
+    const { onValueChange } = await setup();
+    await openPicker();
+
+    await fireEvent.scroll(screen.getByTestId('measurement-wheel'), {
+      nativeEvent: { contentOffset: { y: OPTION_HEIGHT * 2 } }
+    });
+    expect(onValueChange).toHaveBeenLastCalledWith(157);
+
+    await fireEvent.scroll(screen.getByTestId('measurement-wheel'), {
+      nativeEvent: { contentOffset: { y: OPTION_HEIGHT * 7 } }
+    });
+    expect(onValueChange).toHaveBeenLastCalledWith(162);
+    // the picker stays open and its header shows the live value
+    expect(screen.getByText('Done')).toBeOnTheScreen();
+    expect(screen.getAllByText('162 cm').length).toBeGreaterThan(0);
+  });
+
   it('selects the row the wheel stops on', async () => {
     const { onValueChange } = await setup();
     await openPicker();
