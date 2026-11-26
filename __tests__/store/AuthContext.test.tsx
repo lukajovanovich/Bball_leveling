@@ -1,12 +1,30 @@
 import React, { PropsWithChildren } from 'react';
+import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { NETWORK_ERROR_MESSAGE } from '../../src/lib/authErrors';
+import { resetWebAuthRedirectForTests } from '../../src/lib/oauth';
 import { getPendingSignupProfile } from '../../src/lib/pendingSignup';
-import { AuthProvider, useAuth } from '../../src/store/AuthContext';
+import {
+  AuthProvider,
+  SIGN_IN_INCOMPLETE_MESSAGE,
+  GoogleSignInResult,
+  useAuth
+} from '../../src/store/AuthContext';
 import { signupProfile } from '../helpers/fixtures';
-import { makeSession, mockControls, supabase } from '../helpers/supabaseMock';
+import {
+  GOOGLE_AUTH_URL,
+  makeGoogleSession,
+  makeSession,
+  mockControls,
+  supabase
+} from '../helpers/supabaseMock';
 
 jest.mock('../../src/lib/supabase', () => require('../helpers/supabaseMock'));
+jest.mock('expo-web-browser', () => ({ openAuthSessionAsync: jest.fn() }));
+jest.mock('expo-linking', () => ({ createURL: jest.fn(() => 'bballleveling:///') }));
+
+const openAuthSession = jest.mocked(WebBrowser.openAuthSessionAsync);
 
 const Providers = ({ children }: PropsWithChildren) => (
   <AuthProvider>{children}</AuthProvider>
@@ -22,6 +40,11 @@ const renderAuth = async () => {
 
 beforeEach(() => {
   mockControls.reset();
+  openAuthSession.mockReset();
+  openAuthSession.mockResolvedValue({
+    type: 'success',
+    url: 'bballleveling:///?code=google-code'
+  });
 });
 
 describe('AuthProvider startup', () => {
@@ -388,5 +411,271 @@ describe('signOut', () => {
 
     expect(outcome?.success).toBe(false);
     expect(supabase.auth.signOut).not.toHaveBeenCalled();
+  });
+});
+
+describe('signInWithGoogle on native', () => {
+  const signInWithGoogle = async () => {
+    const { result } = await renderAuth();
+    let outcome: GoogleSignInResult | undefined;
+
+    await act(async () => {
+      outcome = await result.current.signInWithGoogle();
+    });
+
+    return outcome as GoogleSignInResult;
+  };
+
+  it('asks Supabase for the Google URL and opens it in an auth browser', async () => {
+    const outcome = await signInWithGoogle();
+
+    expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith({
+      provider: 'google',
+      options: { redirectTo: 'bballleveling:///', skipBrowserRedirect: true }
+    });
+    expect(openAuthSession).toHaveBeenCalledWith(GOOGLE_AUTH_URL, 'bballleveling:///');
+    expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith('google-code');
+    expect(outcome).toEqual({ success: true });
+  });
+
+  it('signs the player in with the session from the code', async () => {
+    const googleSession = makeGoogleSession();
+    supabase.auth.exchangeCodeForSession.mockImplementation(async () => {
+      mockControls.emitAuthChange('SIGNED_IN', googleSession);
+      return { data: googleSession, error: null };
+    });
+    const { result } = await renderAuth();
+
+    await act(async () => {
+      await result.current.signInWithGoogle();
+    });
+
+    expect(result.current.user).toMatchObject({ id: 'google-user' });
+  });
+
+  it.each(['cancel', 'dismiss'])(
+    'reports a %s of the browser as cancelled, not as an error',
+    async (type) => {
+      openAuthSession.mockResolvedValue({ type } as never);
+
+      const outcome = await signInWithGoogle();
+
+      expect(outcome).toEqual({ success: false, cancelled: true });
+      expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    }
+  );
+
+  it('treats a declined consent screen as cancelled', async () => {
+    openAuthSession.mockResolvedValue({
+      type: 'success',
+      url: 'bballleveling:///?error=access_denied&error_description=denied'
+    });
+
+    expect(await signInWithGoogle()).toEqual({ success: false, cancelled: true });
+  });
+
+  it('shows the reason Supabase sent back', async () => {
+    openAuthSession.mockResolvedValue({
+      type: 'success',
+      url: 'bballleveling:///#error=validation_failed&error_description=Unsupported+provider%3A+provider+is+not+enabled'
+    });
+
+    expect(await signInWithGoogle()).toEqual({
+      success: false,
+      message: 'Unsupported provider: provider is not enabled'
+    });
+  });
+
+  it('fails cleanly when the return link has no code', async () => {
+    openAuthSession.mockResolvedValue({ type: 'success', url: 'bballleveling:///' });
+
+    expect(await signInWithGoogle()).toEqual({
+      success: false,
+      message: SIGN_IN_INCOMPLETE_MESSAGE
+    });
+  });
+
+  it('hides a raw code exchange error behind a plain message', async () => {
+    supabase.auth.exchangeCodeForSession.mockResolvedValue({
+      data: { session: null, user: null },
+      error: { message: 'invalid flow state, no valid flow state found' }
+    });
+
+    expect(await signInWithGoogle()).toEqual({
+      success: false,
+      message: SIGN_IN_INCOMPLETE_MESSAGE
+    });
+  });
+
+  it('explains an unreachable server during the exchange', async () => {
+    supabase.auth.exchangeCodeForSession.mockRejectedValue(
+      new TypeError('Network request failed')
+    );
+
+    expect(await signInWithGoogle()).toEqual({
+      success: false,
+      message: NETWORK_ERROR_MESSAGE
+    });
+  });
+
+  it('returns the error when Supabase cannot build the Google URL', async () => {
+    supabase.auth.signInWithOAuth.mockResolvedValue({
+      data: { provider: 'google', url: null },
+      error: { message: 'Failed to fetch' }
+    });
+
+    expect(await signInWithGoogle()).toEqual({
+      success: false,
+      message: NETWORK_ERROR_MESSAGE
+    });
+    expect(openAuthSession).not.toHaveBeenCalled();
+  });
+
+  it('fails cleanly when the browser cannot open', async () => {
+    openAuthSession.mockRejectedValue(new Error('Another web browser is already open'));
+
+    expect(await signInWithGoogle()).toEqual({
+      success: false,
+      message: 'Another web browser is already open'
+    });
+  });
+
+  it('asks for configuration instead of calling Supabase when env vars are missing', async () => {
+    mockControls.setConfigured(false);
+
+    const outcome = await signInWithGoogle();
+
+    expect(outcome.success).toBe(false);
+    expect(outcome.message).toMatch(/EXPO_PUBLIC_SUPABASE_URL/);
+    expect(supabase.auth.signInWithOAuth).not.toHaveBeenCalled();
+    expect(openAuthSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('signInWithGoogle on web', () => {
+  const originalLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  const originalHistory = Object.getOwnPropertyDescriptor(globalThis, 'history');
+  let replaceState: jest.Mock;
+
+  const openAt = (url: string) => {
+    const parsed = new URL(url);
+
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: {
+        href: parsed.href,
+        origin: parsed.origin,
+        pathname: parsed.pathname,
+        search: parsed.search,
+        hash: parsed.hash
+      }
+    });
+    Object.defineProperty(globalThis, 'history', {
+      configurable: true,
+      value: { state: null, replaceState }
+    });
+  };
+
+  const restore = (name: string, descriptor?: PropertyDescriptor) => {
+    if (descriptor) {
+      Object.defineProperty(globalThis, name, descriptor);
+    } else {
+      delete (globalThis as Record<string, unknown>)[name];
+    }
+  };
+
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'web');
+    replaceState = jest.fn();
+    resetWebAuthRedirectForTests();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    restore('location', originalLocation);
+    restore('history', originalHistory);
+    resetWebAuthRedirectForTests();
+  });
+
+  it('sends the page to Google and back to this site', async () => {
+    openAt('https://bballleveling.vercel.app/');
+    const { result } = await renderAuth();
+    let outcome: GoogleSignInResult | undefined;
+
+    await act(async () => {
+      outcome = await result.current.signInWithGoogle();
+    });
+
+    expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://bballleveling.vercel.app/',
+        skipBrowserRedirect: false
+      }
+    });
+    expect(outcome).toEqual({ success: true, redirecting: true });
+    expect(openAuthSession).not.toHaveBeenCalled();
+  });
+
+  it('redeems the code on return, before reading the session, and cleans the URL', async () => {
+    openAt('https://bballleveling.vercel.app/?code=web-code');
+    const googleSession = makeGoogleSession();
+    supabase.auth.exchangeCodeForSession.mockResolvedValue({
+      data: googleSession,
+      error: null
+    });
+    supabase.auth.getSession.mockImplementation(async () => ({
+      data: {
+        session: supabase.auth.exchangeCodeForSession.mock.calls.length
+          ? googleSession
+          : null
+      },
+      error: null
+    }));
+
+    const { result } = await renderAuth();
+
+    expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith('web-code');
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/');
+    expect(result.current.user).toMatchObject({ id: 'google-user' });
+    expect(result.current.redirectError).toBeNull();
+  });
+
+  it('reports a code that cannot be redeemed and can clear it', async () => {
+    openAt('https://bballleveling.vercel.app/?code=used-code');
+    supabase.auth.exchangeCodeForSession.mockResolvedValue({
+      data: { session: null, user: null },
+      error: { message: 'code verifier not found' }
+    });
+
+    const { result } = await renderAuth();
+
+    expect(result.current.redirectError).toBe(SIGN_IN_INCOMPLETE_MESSAGE);
+    expect(result.current.session).toBeNull();
+
+    await act(async () => {
+      result.current.clearRedirectError();
+    });
+
+    expect(result.current.redirectError).toBeNull();
+  });
+
+  it('shows nothing when the player declined on Google', async () => {
+    openAt('https://bballleveling.vercel.app/?error=access_denied&error_description=denied');
+
+    const { result } = await renderAuth();
+
+    expect(result.current.redirectError).toBeNull();
+    expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/');
+  });
+
+  it('does not touch an ordinary page load', async () => {
+    openAt('https://bballleveling.vercel.app/home');
+
+    await renderAuth();
+
+    expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(replaceState).not.toHaveBeenCalled();
   });
 });

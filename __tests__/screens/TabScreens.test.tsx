@@ -18,7 +18,12 @@ import { NETWORK_ERROR_MESSAGE } from '../../src/lib/authErrors';
 import { colors } from '../../src/theme/theme';
 import { newPlayerState } from '../helpers/fixtures';
 import { AppProviders, readProbe, renderApp } from '../helpers/renderApp';
-import { makeSession, mockControls, supabase } from '../helpers/supabaseMock';
+import {
+  makeGoogleSession,
+  makeSession,
+  mockControls,
+  supabase
+} from '../helpers/supabaseMock';
 
 jest.mock('../../src/lib/supabase', () => require('../helpers/supabaseMock'));
 
@@ -782,5 +787,16 @@ describe('navigation shells', () => {
 
     expect(await screen.findByTestId('stack')).toBeOnTheScreen();
     expect(screen.queryByText('Level up')).not.toBeOnTheScreen();
+  });
+
+  it('sends a Google newcomer back to the player setup instead of showing the tabs', async () => {
+    mockControls.startSignedIn(makeGoogleSession());
+    mockControls.setStoredProgress(null);
+
+    await renderApp(<TabsLayout />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/'));
+    expect(screen.queryByTestId('tabs')).not.toBeOnTheScreen();
+    expect(mockControls.upsert).not.toHaveBeenCalled();
   });
 });

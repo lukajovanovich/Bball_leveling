@@ -18,6 +18,13 @@ export const supabase = createClient(
       ...(Platform.OS !== 'web' ? { storage: localStorage } : {}),
       autoRefreshToken: true,
       persistSession: true,
+      // Google sign-in uses PKCE on every platform: the browser comes back
+      // with a one-time `?code=` (no tokens in the URL or history) that only
+      // this device can redeem, because the verifier stays in its storage.
+      // AuthContext redeems it itself instead of detectSessionInUrl, so web
+      // and native share one path, failures can be shown to the player, and
+      // the code is removed from the address bar right away.
+      flowType: 'pkce',
       detectSessionInUrl: false,
       lock: processLock
     }

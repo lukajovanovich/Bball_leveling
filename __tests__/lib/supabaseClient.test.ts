@@ -116,4 +116,17 @@ describe('supabase client setup', () => {
       detectSessionInUrl: false
     });
   });
+
+  it('uses PKCE so the Google return trip carries a code instead of tokens', () => {
+    loadClientModule({
+      EXPO_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test'
+    });
+
+    const options = mockCreateClient.mock.calls[0][2] as {
+      auth: Record<string, unknown>;
+    };
+
+    expect(options.auth.flowType).toBe('pkce');
+  });
 });

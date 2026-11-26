@@ -2,7 +2,9 @@ import { PLAYER_ARCHETYPES, PLAYER_POSITIONS } from '../../src/data/playerOption
 import { createDefaultMeasurements } from '../../src/lib/measurements';
 import {
   buildFallbackSignupProfile,
-  formatNameFromEmail
+  formatNameFromEmail,
+  needsPlayerSetupAfterSignIn,
+  suggestPlayerName
 } from '../../src/lib/playerIdentity';
 
 describe('formatNameFromEmail', () => {
@@ -51,5 +53,36 @@ describe('buildFallbackSignupProfile', () => {
       archetype: PLAYER_ARCHETYPES[0],
       mainGoal: 'Build my player from the ground up'
     });
+  });
+});
+
+describe('needsPlayerSetupAfterSignIn', () => {
+  it('asks Google accounts for the player setup', () => {
+    expect(needsPlayerSetupAfterSignIn({ app_metadata: { provider: 'google' } })).toBe(true);
+  });
+
+  it('keeps email accounts on the profile entered at sign-up', () => {
+    expect(needsPlayerSetupAfterSignIn({ app_metadata: { provider: 'email' } })).toBe(false);
+    expect(needsPlayerSetupAfterSignIn({ email: 'a@b.com' })).toBe(false);
+    expect(needsPlayerSetupAfterSignIn({ app_metadata: null })).toBe(false);
+  });
+});
+
+describe('suggestPlayerName', () => {
+  it('prefers the full name Google shared', () => {
+    expect(
+      suggestPlayerName({
+        email: 'jm23@gmail.com',
+        user_metadata: { full_name: '  Jordan Miles ', name: 'Jordan' }
+      })
+    ).toBe('Jordan Miles');
+  });
+
+  it('falls back to the name, then to the email', () => {
+    expect(suggestPlayerName({ user_metadata: { name: 'Jordan' } })).toBe('Jordan');
+    expect(
+      suggestPlayerName({ email: 'jordan.miles@gmail.com', user_metadata: { full_name: '' } })
+    ).toBe('Jordan Miles');
+    expect(suggestPlayerName({ user_metadata: { full_name: 42 } })).toBe('');
   });
 });

@@ -30,3 +30,28 @@ export const buildFallbackSignupProfile = (
     mainGoal: 'Build my player from the ground up'
   };
 };
+
+interface AccountIdentity {
+  email?: string | null;
+  app_metadata?: { provider?: unknown } | null;
+  user_metadata?: Record<string, unknown> | null;
+}
+
+/**
+ * Email sign-up collects the player setup before the account exists. Google
+ * (or any other provider) skips that form, so the player fills it in after
+ * their first sign-in instead of getting a made-up default profile.
+ */
+export const needsPlayerSetupAfterSignIn = (account: AccountIdentity) => {
+  const provider = account.app_metadata?.provider;
+
+  return typeof provider === 'string' && provider !== 'email';
+};
+
+const readText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+/** The name Google shared, else one built from the email. */
+export const suggestPlayerName = (account: AccountIdentity) =>
+  readText(account.user_metadata?.full_name) ||
+  readText(account.user_metadata?.name) ||
+  formatNameFromEmail(account.email ?? '');

@@ -20,6 +20,8 @@ export const supabase = {
     onAuthStateChange: jest.fn(),
     signInWithPassword: jest.fn(),
     signUp: jest.fn(),
+    signInWithOAuth: jest.fn(),
+    exchangeCodeForSession: jest.fn(),
     signOut: jest.fn(),
     startAutoRefresh: jest.fn(),
     stopAutoRefresh: jest.fn()
@@ -31,6 +33,23 @@ export const makeSession = (id = 'user-1', email = 'player@example.com') => ({
   access_token: 'test-token',
   user: { id, email }
 });
+
+/** A session as Supabase returns it after a Google sign-in. */
+export const makeGoogleSession = (
+  id = 'google-user',
+  email = 'jordan.miles@gmail.com',
+  metadata: Record<string, unknown> = { full_name: 'Jordan Miles' }
+) => ({
+  access_token: 'google-token',
+  user: {
+    id,
+    email,
+    app_metadata: { provider: 'google', providers: ['google'] },
+    user_metadata: metadata
+  }
+});
+
+export const GOOGLE_AUTH_URL = 'https://project.supabase.co/auth/v1/authorize?provider=google';
 
 export const mockControls = {
   maybeSingle,
@@ -101,6 +120,14 @@ export const mockControls = {
       error: null
     });
     supabase.auth.signOut.mockResolvedValue({ error: null });
+    supabase.auth.signInWithOAuth.mockResolvedValue({
+      data: { provider: 'google', url: GOOGLE_AUTH_URL },
+      error: null
+    });
+    supabase.auth.exchangeCodeForSession.mockResolvedValue({
+      data: { session: null, user: null },
+      error: null
+    });
 
     maybeSingle.mockResolvedValue({ data: null, error: null });
     eq.mockReturnValue({ maybeSingle });

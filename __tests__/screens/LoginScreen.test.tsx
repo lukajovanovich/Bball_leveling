@@ -1,4 +1,6 @@
 import React from 'react';
+import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import LoginScreen from '../../app/index';
@@ -8,11 +10,23 @@ import {
   DEFAULT_WEIGHT_KG,
   DEFAULT_WINGSPAN_CM
 } from '../../src/lib/measurements';
+import { resetWebAuthRedirectForTests } from '../../src/lib/oauth';
+import { SIGN_IN_INCOMPLETE_MESSAGE } from '../../src/store/AuthContext';
 import { newPlayerState } from '../helpers/fixtures';
-import { renderApp } from '../helpers/renderApp';
-import { makeSession, mockControls, supabase } from '../helpers/supabaseMock';
+import { readProbe, renderApp } from '../helpers/renderApp';
+import {
+  GOOGLE_AUTH_URL,
+  makeGoogleSession,
+  makeSession,
+  mockControls,
+  supabase
+} from '../helpers/supabaseMock';
 
 jest.mock('../../src/lib/supabase', () => require('../helpers/supabaseMock'));
+jest.mock('expo-web-browser', () => ({ openAuthSessionAsync: jest.fn() }));
+jest.mock('expo-linking', () => ({ createURL: jest.fn(() => 'bballleveling:///') }));
+
+const openAuthSession = jest.mocked(WebBrowser.openAuthSessionAsync);
 
 const EMAIL = 'you@example.com';
 const GOAL = 'What kind of player do you want to become?';
@@ -38,6 +52,11 @@ beforeEach(() => {
   mockControls.reset();
   jest.mocked(router.replace).mockClear();
   jest.mocked(router.push).mockClear();
+  openAuthSession.mockReset();
+  openAuthSession.mockResolvedValue({
+    type: 'success',
+    url: 'bballleveling:///?code=google-code'
+  });
 });
 
 describe('sign in', () => {
@@ -423,5 +442,302 @@ describe('sign up', () => {
     await openSignUp();
 
     expect(emailInput()).toHaveDisplayValue('keep@example.com');
+  });
+});
+
+describe('continue with Google', () => {
+  const googleButton = () => screen.getByRole('button', { name: 'Continue with Google' });
+
+  it('signs in through Google with the Google provider', async () => {
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.press(googleButton());
+
+    await waitFor(() =>
+      expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith('google-code')
+    );
+    expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'google' })
+    );
+    expect(openAuthSession).toHaveBeenCalledWith(GOOGLE_AUTH_URL, 'bballleveling:///');
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('is offered in sign up too', async () => {
+    await renderApp(<LoginScreen />);
+    await openSignUp();
+
+    expect(googleButton()).toBeEnabled();
+  });
+
+  it('shows why Google sign-in failed and lets the player retry', async () => {
+    openAuthSession.mockResolvedValueOnce({
+      type: 'success',
+      url: 'bballleveling:///?error=server_error&error_description=Unable+to+exchange+external+code'
+    });
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.press(googleButton());
+
+    expect(await screen.findByText('Unable to exchange external code')).toBeOnTheScreen();
+    expect(googleButton()).toBeEnabled();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('explains an unreachable server', async () => {
+    supabase.auth.exchangeCodeForSession.mockRejectedValue(new TypeError('Failed to fetch'));
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.press(googleButton());
+
+    expect(await screen.findByText(NETWORK_ERROR_MESSAGE)).toBeOnTheScreen();
+  });
+
+  it('shows nothing when the player closes Google', async () => {
+    openAuthSession.mockResolvedValue({ type: 'cancel' } as never);
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.press(googleButton());
+
+    await waitFor(() => expect(googleButton()).toBeEnabled());
+    expect(openAuthSession).toHaveBeenCalledTimes(1);
+    expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(screen.queryByText(SIGN_IN_INCOMPLETE_MESSAGE)).not.toBeOnTheScreen();
+    expect(screen.queryByText(/Signed in/)).not.toBeOnTheScreen();
+    expect(screen.queryByText(/went wrong/)).not.toBeOnTheScreen();
+  });
+
+  it('shows "Opening Google..." and blocks a second tap while the browser is open', async () => {
+    let close: (value: never) => void = () => {};
+    openAuthSession.mockReturnValue(
+      new Promise((resolve) => {
+        close = resolve;
+      })
+    );
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.press(googleButton());
+
+    const busy = await screen.findByRole('button', { name: 'Opening Google...' });
+    expect(busy).toBeDisabled();
+    await fireEvent.press(busy);
+    expect(supabase.auth.signInWithOAuth).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      close({ type: 'cancel' } as never);
+    });
+
+    expect(googleButton()).toBeEnabled();
+  });
+
+  it('is disabled with a reason when accounts are not configured', async () => {
+    mockControls.setConfigured(false);
+    await renderApp(<LoginScreen />);
+
+    expect(googleButton()).toBeDisabled();
+    expect(
+      screen.getByText('Google sign-in needs accounts to be set up first.')
+    ).toBeOnTheScreen();
+
+    await fireEvent.press(googleButton());
+
+    expect(supabase.auth.signInWithOAuth).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('button', { name: /Continue as guest/ })
+    ).toBeEnabled();
+  });
+});
+
+describe('player setup after a first Google sign-in', () => {
+  const nameInput = () => screen.getByPlaceholderText('Name on your jersey');
+  const createButton = () => screen.getByRole('button', { name: 'Create player' });
+
+  it('shows the setup with the Google name filled in when no player exists', async () => {
+    mockControls.startSignedIn(makeGoogleSession('google-1', 'jm@gmail.com'));
+    mockControls.setStoredProgress(null);
+
+    await renderApp(<LoginScreen />);
+
+    expect(await screen.findByText('Set up your player')).toBeOnTheScreen();
+    expect(screen.getByText(/Signed in as jm@gmail.com/)).toBeOnTheScreen();
+    expect(nameInput()).toHaveDisplayValue('Jordan Miles');
+    expect(screen.getByText('Height')).toBeOnTheScreen();
+    expect(screen.getByText('Wingspan')).toBeOnTheScreen();
+    expect(screen.getByText('Weight')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Center' })).toBeOnTheScreen();
+    expect(screen.queryByPlaceholderText('Your password')).not.toBeOnTheScreen();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(mockControls.upsert).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the name Google calls "name"', async () => {
+    mockControls.startSignedIn(
+      makeGoogleSession('google-1', 'jm@gmail.com', { name: 'J. Miles' })
+    );
+    mockControls.setStoredProgress(null);
+
+    await renderApp(<LoginScreen />);
+
+    expect(nameInput()).toHaveDisplayValue('J. Miles');
+  });
+
+  it('creates the player from the setup, saves the row and opens Home', async () => {
+    mockControls.startSignedIn(makeGoogleSession('google-1', 'jm@gmail.com'));
+    mockControls.setStoredProgress(null);
+    await renderApp(<LoginScreen />);
+
+    expect(createButton()).toBeDisabled();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Small Forward' }));
+    await fireEvent.press(screen.getByRole('button', { name: '3-and-D Wing' }));
+    await fireEvent.changeText(screen.getByPlaceholderText(GOAL), 'Make varsity');
+    await fireEvent.press(createButton());
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+    expect(mockControls.upsert).toHaveBeenCalledTimes(1);
+    expect(mockControls.upsert.mock.calls[0][0]).toMatchObject({
+      user_id: 'google-1',
+      email: 'jm@gmail.com'
+    });
+    expect(mockControls.upsert.mock.calls[0][0].progress_state.player).toMatchObject({
+      name: 'Jordan Miles',
+      position: 'Small Forward',
+      archetype: '3-and-D Wing',
+      mainGoal: 'Make varsity',
+      heightCm: DEFAULT_HEIGHT_CM,
+      wingspanCm: DEFAULT_WINGSPAN_CM,
+      weightKg: DEFAULT_WEIGHT_KG,
+      totalXp: 0
+    });
+    expect(readProbe().name).toBe('Jordan Miles');
+  });
+
+  it('keeps the setup open and shows the error when saving fails', async () => {
+    mockControls.startSignedIn(makeGoogleSession());
+    mockControls.setStoredProgress(null);
+    mockControls.upsert.mockResolvedValueOnce({ error: { message: 'Failed to fetch' } });
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.changeText(screen.getByPlaceholderText(GOAL), 'Make varsity');
+    await fireEvent.press(createButton());
+
+    expect(await screen.findByText(NETWORK_ERROR_MESSAGE)).toBeOnTheScreen();
+    expect(screen.getByText('Set up your player')).toBeOnTheScreen();
+    expect(router.replace).not.toHaveBeenCalled();
+
+    await fireEvent.press(createButton());
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+  });
+
+  it('shows the setup right after Google sign-in from the form', async () => {
+    mockControls.setStoredProgress(null);
+    supabase.auth.exchangeCodeForSession.mockImplementation(async () => {
+      mockControls.emitAuthChange('SIGNED_IN', makeGoogleSession());
+      return { data: makeGoogleSession(), error: null };
+    });
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue with Google' }));
+
+    expect(await screen.findByText('Set up your player')).toBeOnTheScreen();
+    expect(nameInput()).toHaveDisplayValue('Jordan Miles');
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('lets the player switch to another account', async () => {
+    mockControls.startSignedIn(makeGoogleSession());
+    mockControls.setStoredProgress(null);
+    supabase.auth.signOut.mockImplementation(async () => {
+      mockControls.emitAuthChange('SIGNED_OUT', null);
+      return { error: null };
+    });
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Use another account' }));
+
+    expect(await screen.findByText('Sign in to your build')).toBeOnTheScreen();
+    expect(mockControls.upsert).not.toHaveBeenCalled();
+  });
+
+  it('sends a returning Google player straight to Home', async () => {
+    mockControls.startSignedIn(makeGoogleSession());
+    mockControls.setStoredProgress(newPlayerState({}, 500));
+
+    await renderApp(<LoginScreen />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+    expect(screen.queryByText('Set up your player')).not.toBeOnTheScreen();
+    expect(mockControls.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('coming back from Google on web', () => {
+  const originalLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  const originalHistory = Object.getOwnPropertyDescriptor(globalThis, 'history');
+
+  const openAt = (url: string) => {
+    const parsed = new URL(url);
+
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: {
+        href: parsed.href,
+        origin: parsed.origin,
+        pathname: parsed.pathname,
+        search: parsed.search,
+        hash: parsed.hash
+      }
+    });
+    Object.defineProperty(globalThis, 'history', {
+      configurable: true,
+      value: { state: null, replaceState: jest.fn() }
+    });
+  };
+
+  const restore = (name: string, descriptor?: PropertyDescriptor) => {
+    if (descriptor) {
+      Object.defineProperty(globalThis, name, descriptor);
+    } else {
+      delete (globalThis as Record<string, unknown>)[name];
+    }
+  };
+
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'web');
+    resetWebAuthRedirectForTests();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    restore('location', originalLocation);
+    restore('history', originalHistory);
+    resetWebAuthRedirectForTests();
+  });
+
+  it('shows why the return trip could not sign the player in', async () => {
+    openAt('https://bballleveling.vercel.app/?code=stale');
+    supabase.auth.exchangeCodeForSession.mockResolvedValue({
+      data: { session: null, user: null },
+      error: { message: 'code verifier not found' }
+    });
+
+    await renderApp(<LoginScreen />);
+
+    expect(await screen.findByText(SIGN_IN_INCOMPLETE_MESSAGE)).toBeOnTheScreen();
+
+    await openSignUp();
+
+    expect(screen.queryByText(SIGN_IN_INCOMPLETE_MESSAGE)).not.toBeOnTheScreen();
+  });
+
+  it('keeps the button busy while the page leaves for Google', async () => {
+    openAt('https://bballleveling.vercel.app/');
+    await renderApp(<LoginScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue with Google' }));
+
+    expect(await screen.findByRole('button', { name: 'Opening Google...' })).toBeDisabled();
+    expect(openAuthSession).not.toHaveBeenCalled();
   });
 });

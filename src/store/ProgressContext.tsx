@@ -18,7 +18,10 @@ import {
   clearPendingSignupProfile,
   getPendingSignupProfile
 } from '../lib/pendingSignup';
-import { buildFallbackSignupProfile } from '../lib/playerIdentity';
+import {
+  buildFallbackSignupProfile,
+  needsPlayerSetupAfterSignIn
+} from '../lib/playerIdentity';
 import {
   fetchPlayerProgressState,
   upsertPlayerProgressState
@@ -54,6 +57,11 @@ interface ProgressContextValue {
   levelInfo: ReturnType<typeof getLevelInfo>;
   isHydrating: boolean;
   syncError: string | null;
+  /**
+   * Signed in (e.g. with Google) but no player exists yet and none was entered
+   * at sign-up. The app shows the player setup until createNewProfile runs.
+   */
+  needsPlayerSetup: boolean;
   /** Returns null, and changes nothing, when today's limit blocks this workout. */
   logWorkout: (
     workoutType: WorkoutType,
@@ -62,7 +70,8 @@ interface ProgressContextValue {
     focus?: readonly string[]
   ) => ProgressUpdate | null;
   updateProfile: (profile: Partial<EditableProfileFields>) => void;
-  createNewProfile: (profile: EditableProfileFields) => void;
+  /** Resolves with an error message when the save failed, else null. */
+  createNewProfile: (profile: EditableProfileFields) => Promise<string | null>;
   dismissLevelUp: () => void;
 }
 
@@ -75,21 +84,33 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
   const { user, isLoading: isAuthLoading, isConfigured } = useAuth();
   const [state, setState] = useState<ProgressState>(() => createInitialProgressState());
   const [isHydrating, setIsHydrating] = useState(true);
+  // Whose data the state holds. A new sign-in counts as loading from its very
+  // first render, before the effect below has started the fetch; otherwise
+  // the sign-in screen would see "signed in, not loading" and leave too early.
+  const [hydratedUserId, setHydratedUserId] = useState<string | null | undefined>(
+    undefined
+  );
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [needsPlayerSetup, setNeedsPlayerSetup] = useState(false);
+  // While setup is pending local state is placeholder data, so nothing but
+  // the setup itself may be saved.
+  const needsPlayerSetupRef = useRef(false);
   // Set only after this user's cloud save was read (or found to not exist).
   // Until then local state is not theirs, and saving it would overwrite their
   // real progress in the database.
   const cloudReadyUserIdRef = useRef<string | null>(null);
 
   const persistProgressState = useCallback(
-    async (nextState: ProgressState) => {
+    async (nextState: ProgressState): Promise<string | null> => {
       if (!user || !isConfigured) {
-        return;
+        return null;
       }
 
-      if (cloudReadyUserIdRef.current !== user.id) {
-        return;
+      if (cloudReadyUserIdRef.current !== user.id || needsPlayerSetupRef.current) {
+        return null;
       }
+
+      let message: string | null;
 
       try {
         const { error } = await upsertPlayerProgressState(
@@ -98,16 +119,24 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
           nextState
         );
 
-        setSyncError(error ? describeError(error) : null);
+        message = error ? describeError(error) : null;
       } catch (error) {
-        setSyncError(describeError(error));
+        message = describeError(error);
       }
+
+      setSyncError(message);
+      return message;
     },
     [isConfigured, user]
   );
 
   useEffect(() => {
     let active = true;
+
+    const finishHydrating = () => {
+      setIsHydrating(false);
+      setHydratedUserId(user?.id ?? null);
+    };
 
     const hydrate = async () => {
       if (isAuthLoading) {
@@ -116,11 +145,13 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
 
       if (!user) {
         cloudReadyUserIdRef.current = null;
+        needsPlayerSetupRef.current = false;
+        setNeedsPlayerSetup(false);
 
         if (active) {
           setState(createInitialProgressState());
           setSyncError(null);
-          setIsHydrating(false);
+          finishHydrating();
         }
 
         return;
@@ -129,7 +160,7 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       if (!isConfigured) {
         if (active) {
           setSyncError(missingConfigMessage);
-          setIsHydrating(false);
+          finishHydrating();
         }
 
         return;
@@ -152,7 +183,7 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
 
         if (result.error) {
           setSyncError(describeError(result.error));
-          setIsHydrating(false);
+          finishHydrating();
           return;
         }
 
@@ -160,24 +191,39 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       } catch (error) {
         if (active) {
           setSyncError(describeError(error));
-          setIsHydrating(false);
+          finishHydrating();
         }
 
         return;
       }
 
       cloudReadyUserIdRef.current = user.id;
+      needsPlayerSetupRef.current = false;
+      setNeedsPlayerSetup(false);
 
       if (data) {
         clearPendingSignupProfile();
         setState(data);
         setSyncError(null);
-        setIsHydrating(false);
+        finishHydrating();
+        return;
+      }
+
+      const pendingProfile = getPendingSignupProfile();
+
+      // The row is known to be missing, so creating it is safe, but only the
+      // player can say how tall they are: wait for the setup form.
+      if (!pendingProfile && needsPlayerSetupAfterSignIn(user)) {
+        needsPlayerSetupRef.current = true;
+        setNeedsPlayerSetup(true);
+        setState(createInitialProgressState());
+        setSyncError(null);
+        finishHydrating();
         return;
       }
 
       const fallbackProfile =
-        getPendingSignupProfile() ?? buildFallbackSignupProfile(user.email);
+        pendingProfile ?? buildFallbackSignupProfile(user.email);
       const nextState = createProgressStateFromPlayer(
         buildNewPlayerProfile(fallbackProfile)
       );
@@ -209,7 +255,7 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
         setSyncError(null);
       }
 
-      setIsHydrating(false);
+      finishHydrating();
     };
 
     hydrate();
@@ -255,12 +301,25 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
   );
 
   const createNewProfile = useCallback(
-    (profile: EditableProfileFields) => {
+    async (profile: EditableProfileFields) => {
       const nextPlayer = buildNewPlayerProfile(profile);
       const nextState = createProgressStateFromPlayer(nextPlayer);
+      const finishesSetup = needsPlayerSetupRef.current;
 
+      needsPlayerSetupRef.current = false;
       setState(nextState);
-      void persistProgressState(nextState);
+
+      const saveError = await persistProgressState(nextState);
+
+      if (finishesSetup && saveError) {
+        // No row exists yet: keep the setup open so the player can retry
+        // instead of playing on a profile that was never saved.
+        needsPlayerSetupRef.current = true;
+      } else if (finishesSetup) {
+        setNeedsPlayerSetup(false);
+      }
+
+      return saveError;
     },
     [persistProgressState]
   );
@@ -278,8 +337,9 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       player: state.player,
       ovr: calculateOvr(state.player.attributes),
       levelInfo: getLevelInfo(state.player.totalXp),
-      isHydrating,
+      isHydrating: isHydrating || hydratedUserId !== (user?.id ?? null),
       syncError,
+      needsPlayerSetup,
       logWorkout,
       updateProfile,
       createNewProfile,
@@ -288,11 +348,14 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
     [
       createNewProfile,
       dismissLevelUp,
+      hydratedUserId,
       isHydrating,
       logWorkout,
+      needsPlayerSetup,
       state,
       syncError,
-      updateProfile
+      updateProfile,
+      user
     ]
   );
 

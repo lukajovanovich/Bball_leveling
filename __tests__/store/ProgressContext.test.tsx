@@ -11,7 +11,12 @@ import { AuthProvider, useAuth } from '../../src/store/AuthContext';
 import { ProgressProvider, useProgress } from '../../src/store/ProgressContext';
 import { ProgressState } from '../../src/types';
 import { newPlayerState, signupProfile } from '../helpers/fixtures';
-import { makeSession, mockControls, supabase } from '../helpers/supabaseMock';
+import {
+  makeGoogleSession,
+  makeSession,
+  mockControls,
+  supabase
+} from '../helpers/supabaseMock';
 
 jest.mock('../../src/lib/supabase', () => require('../helpers/supabaseMock'));
 
@@ -501,5 +506,114 @@ describe('switching accounts', () => {
       email: 'b@example.com'
     });
     expect(savedState().player.name).toBe('Second Account');
+  });
+});
+
+describe('first Google sign-in', () => {
+  const googleNewcomer = async () => {
+    mockControls.startSignedIn(makeGoogleSession('google-1', 'jordan@gmail.com'));
+    mockControls.setStoredProgress(null);
+
+    return renderProgress();
+  };
+
+  it('asks for the player setup instead of saving a made-up profile', async () => {
+    const { result } = await googleNewcomer();
+
+    expect(mockControls.eq).toHaveBeenCalledWith('user_id', 'google-1');
+    expect(result.current.progress.needsPlayerSetup).toBe(true);
+    expect(result.current.progress.syncError).toBeNull();
+    expect(mockControls.upsert).not.toHaveBeenCalled();
+  });
+
+  it('saves nothing but the setup while it is pending', async () => {
+    const { result } = await googleNewcomer();
+
+    await act(async () => {
+      result.current.progress.logWorkout('shooting', 'hard');
+    });
+    await act(async () => {
+      result.current.progress.updateProfile({ name: 'Placeholder' });
+    });
+
+    expect(mockControls.upsert).not.toHaveBeenCalled();
+  });
+
+  it('creates the first save from the setup and finishes it', async () => {
+    const { result } = await googleNewcomer();
+    let saveError: string | null | undefined;
+
+    await act(async () => {
+      saveError = await result.current.progress.createNewProfile({
+        ...signupProfile,
+        name: 'Jordan Miles'
+      });
+    });
+
+    expect(saveError).toBeNull();
+    expect(result.current.progress.needsPlayerSetup).toBe(false);
+    expect(result.current.progress.player.name).toBe('Jordan Miles');
+    expect(mockControls.upsert).toHaveBeenCalledTimes(1);
+    expect(mockControls.upsert.mock.calls[0][0]).toMatchObject({
+      user_id: 'google-1',
+      email: 'jordan@gmail.com'
+    });
+    expect(savedState().player).toMatchObject({
+      name: 'Jordan Miles',
+      position: signupProfile.position,
+      totalXp: 0
+    });
+  });
+
+  it('keeps the setup open when the first save fails', async () => {
+    const { result } = await googleNewcomer();
+    mockControls.upsert.mockResolvedValueOnce({ error: { message: 'insert blocked' } });
+    let saveError: string | null | undefined;
+
+    await act(async () => {
+      saveError = await result.current.progress.createNewProfile(signupProfile);
+    });
+
+    expect(saveError).toBe('insert blocked');
+    expect(result.current.progress.needsPlayerSetup).toBe(true);
+
+    await act(async () => {
+      saveError = await result.current.progress.createNewProfile(signupProfile);
+    });
+
+    expect(saveError).toBeNull();
+    expect(result.current.progress.needsPlayerSetup).toBe(false);
+    expect(mockControls.upsert).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses a profile entered at email sign-up on this device', async () => {
+    savePendingSignupProfile({ ...signupProfile, name: 'Typed Earlier' });
+
+    const { result } = await googleNewcomer();
+
+    expect(result.current.progress.needsPlayerSetup).toBe(false);
+    expect(savedState().player.name).toBe('Typed Earlier');
+  });
+
+  it('loads a returning Google player without asking again', async () => {
+    mockControls.startSignedIn(makeGoogleSession('google-1'));
+    mockControls.setStoredProgress(newPlayerState({ speed: 40 }, 800));
+
+    const { result } = await renderProgress();
+
+    expect(result.current.progress.needsPlayerSetup).toBe(false);
+    expect(result.current.progress.player.attributes.speed).toBe(40);
+    expect(mockControls.upsert).not.toHaveBeenCalled();
+  });
+
+  it('drops the pending setup on sign out', async () => {
+    const { result } = await googleNewcomer();
+
+    await act(async () => {
+      mockControls.emitAuthChange('SIGNED_OUT', null);
+    });
+
+    await waitFor(() => expect(result.current.progress.needsPlayerSetup).toBe(false));
+    expect(result.current.progress.player).toEqual(samplePlayer);
   });
 });
