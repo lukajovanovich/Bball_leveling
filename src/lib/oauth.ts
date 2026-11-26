@@ -4,6 +4,7 @@ import * as Linking from 'expo-linking';
 export interface AuthRedirectParams {
   code: string | null;
   error: string | null;
+  errorCode: string | null;
   errorDescription: string | null;
 }
 
@@ -25,6 +26,7 @@ export const parseAuthRedirectUrl = (url: string): AuthRedirectParams => {
   return {
     code: get('code'),
     error: get('error'),
+    errorCode: get('error_code'),
     errorDescription: get('error_description')
   };
 };
@@ -33,9 +35,11 @@ export const hasAuthRedirectParams = (params: AuthRedirectParams) =>
   Boolean(params.code || params.error);
 
 // Google answers "access_denied" when the player closes or declines the
-// consent screen. That is a choice, not a failure.
+// consent screen. That is a choice, not a failure. Supabase also sends
+// "access_denied" with error_code "otp_expired" for an old email link, and
+// that one the player has to hear about.
 export const isCancelledAuthRedirect = (params: AuthRedirectParams) =>
-  params.error === 'access_denied';
+  params.error === 'access_denied' && !params.errorCode?.startsWith('otp_');
 
 /** Where Supabase sends the player back after Google. */
 export const getOAuthRedirectUrl = () => {

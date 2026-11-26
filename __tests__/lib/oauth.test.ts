@@ -58,6 +58,7 @@ describe('parseAuthRedirectUrl', () => {
     expect(parseAuthRedirectUrl('https://bballleveling.vercel.app/?code=abc123')).toEqual({
       code: 'abc123',
       error: null,
+      errorCode: null,
       errorDescription: null
     });
   });
@@ -75,6 +76,7 @@ describe('parseAuthRedirectUrl', () => {
     ).toEqual({
       code: null,
       error: 'server_error',
+      errorCode: null,
       errorDescription: 'Unable to exchange external code'
     });
   });
@@ -92,6 +94,15 @@ describe('parseAuthRedirectUrl', () => {
     expect(
       isCancelledAuthRedirect(parseAuthRedirectUrl('https://app.test/?error=server_error'))
     ).toBe(false);
+  });
+
+  it('does not hide an expired email link as a cancel', () => {
+    const params = parseAuthRedirectUrl(
+      'https://app.test/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'
+    );
+
+    expect(params.errorCode).toBe('otp_expired');
+    expect(isCancelledAuthRedirect(params)).toBe(false);
   });
 });
 

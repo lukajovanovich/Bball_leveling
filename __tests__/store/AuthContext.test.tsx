@@ -685,6 +685,18 @@ describe('signInWithGoogle on web', () => {
     expect(replaceState).toHaveBeenCalledWith(null, '', '/');
   });
 
+  it('explains an expired email confirmation link instead of ignoring it', async () => {
+    openAt(
+      'https://bballleveling.vercel.app/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'
+    );
+
+    const { result } = await renderAuth();
+
+    expect(result.current.redirectError).toBe('Email link is invalid or has expired');
+    expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/');
+  });
+
   it('does not touch an ordinary page load', async () => {
     openAt('https://bballleveling.vercel.app/home');
 
