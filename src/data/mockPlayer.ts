@@ -296,7 +296,10 @@ export const normalizeProgressState = (
       ? state.quests
       : createInitialQuests(player.attributes),
     trainingSessions: Array.isArray(state?.trainingSessions)
-      ? state.trainingSessions.map(normalizeTrainingSession)
+      ? state.trainingSessions
+          // A broken entry would crash the daily limit check on Train.
+          .filter((session) => Boolean(session) && typeof session === 'object')
+          .map(normalizeTrainingSession)
       : [],
     activityLog: Array.isArray(state?.activityLog) ? state.activityLog : [],
     lastLevelUp: state?.lastLevelUp ?? null

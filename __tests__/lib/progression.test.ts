@@ -1059,3 +1059,171 @@ describe('pickup game', () => {
     expect(getWorkoutAvailability(twice, 'game')).toBe('locked');
   });
 });
+
+describe('focus and pickup games on uneven ratings', () => {
+  // Small deterministic generator, so a failure always reproduces.
+  const seeded = (seed: number) => () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+  const total = (gains: Partial<Record<AttributeKey, number>>) =>
+    Object.values(gains).reduce((sum, gain) => sum + (gain ?? 0), 0);
+  const ALL_KEYS = ATTRIBUTE_CATEGORIES.flatMap((category) =>
+    category.attributes.map((attribute) => attribute.key)
+  );
+
+  it('never passes 99 and never beats the general total, with ratings near the cap', () => {
+    const random = seeded(7);
+
+    for (let round = 0; round < 60; round += 1) {
+      // Mostly 75-99 so the slow-down and the cap are hit often.
+      const attributes = attributesWith(
+        Object.fromEntries(
+          ALL_KEYS.map((key) => [
+            key,
+            random() < 0.2 ? Math.floor(random() * 75) : 75 + Math.floor(random() * 25)
+          ])
+        )
+      );
+
+      WORKOUTS.forEach((workout) => {
+        INTENSITIES.forEach((intensity) => {
+          const general = calculateWorkoutResult(workout.type, intensity, attributes);
+          const picks = [
+            [],
+            ...workout.focusOptions.map((option) => [option.id]),
+            workout.focusOptions
+              .filter(() => random() < 0.5)
+              .map((option) => option.id)
+          ];
+
+          picks.forEach((focus) => {
+            const { attributeGains } = calculateWorkoutResult(
+              workout.type,
+              intensity,
+              attributes,
+              focus
+            );
+
+            expect(total(attributeGains)).toBeLessThanOrEqual(total(general.attributeGains));
+            Object.entries(attributeGains).forEach(([key, gain]) => {
+              expect(gain).toBeGreaterThanOrEqual(1);
+              expect(attributes[key as AttributeKey] + gain!).toBeLessThanOrEqual(
+                ATTRIBUTE_MAX
+              );
+            });
+          });
+        });
+      });
+    }
+  });
+
+  it('gives nothing for a focus whose ratings are all 99, and says so', () => {
+    const update = applyWorkoutToProgress(
+      newPlayerState({ perimeterDefense: 99 }),
+      'defense',
+      'hard',
+      ['perimeter']
+    );
+
+    expect(update.attributeGains).toEqual({});
+    expect(update.state.player.attributes.perimeterDefense).toBe(99);
+    expect(
+      update.state.activityLog.some((item) => /already capped/.test(item.description))
+    ).toBe(true);
+  });
+});
+
+describe('quests with focused sessions and pickup games', () => {
+  it('counts a focused session and a pickup game for "Complete 1 workout"', () => {
+    const focused = applyWorkoutToProgress(newPlayerState(), 'defense', 'light', [
+      'blocks'
+    ]);
+    const game = applyWorkoutToProgress(newPlayerState(), 'game', 'light');
+
+    [focused, game].forEach((update) => {
+      expect(findQuest(update.state, 'daily-complete-workout')).toMatchObject({
+        progress: 1,
+        completed: true
+      });
+    });
+  });
+
+  it('counts a focused defense session for the defense workout quest', () => {
+    const update = applyWorkoutToProgress(newPlayerState(), 'defense', 'light', [
+      'steals'
+    ]);
+
+    expect(findQuest(update.state, 'daily-defense-workout')).toMatchObject({
+      progress: 1,
+      completed: true
+    });
+  });
+
+  it('does not count a pickup game as a workout of another type', () => {
+    const update = applyWorkoutToProgress(newPlayerState(), 'game', 'hard');
+
+    expect(findQuest(update.state, 'daily-defense-workout').progress).toBe(0);
+    expect(findQuest(update.state, 'weekly-finishing-two').progress).toBe(0);
+  });
+
+  it('moves "Improve Three-Point Shot" only when the focus trains it', () => {
+    const threes = applyWorkoutToProgress(newPlayerState(), 'shooting', 'light', [
+      'threePointers'
+    ]);
+    const freeThrows = applyWorkoutToProgress(newPlayerState(), 'shooting', 'hard', [
+      'freeThrows'
+    ]);
+
+    expect(findQuest(threes.state, 'daily-improve-three')).toMatchObject({
+      completed: true
+    });
+    expect(findQuest(freeThrows.state, 'daily-improve-three')).toMatchObject({
+      progress: 0,
+      completed: false
+    });
+  });
+
+  it('tracks a reach-attribute quest through a focused session', () => {
+    const update = applyWorkoutToProgress(
+      newPlayerState({ ballHandle: 70 }),
+      'ballHandling',
+      'hard',
+      ['handles']
+    );
+
+    expect(update.state.player.attributes.ballHandle).toBe(74);
+    expect(findQuest(update.state, 'weekly-ball-handle-75')).toMatchObject({
+      progress: 74,
+      completed: false
+    });
+  });
+});
+
+describe('fadeaway and OVR', () => {
+  it('counts fadeaway in the Shooting average and in OVR', () => {
+    const shooting = ATTRIBUTE_CATEGORIES.find((category) => category.id === 'shooting')!;
+    const withFadeaway = attributesWith({ fadeaway: 80 });
+
+    expect(getCategoryAverage(withFadeaway, shooting)).toBe(20);
+    expect(calculateOvr(withFadeaway)).toBeGreaterThan(calculateOvr(attributesWith()));
+  });
+
+  it('raises the Shooting average when a fadeaway-focused session raises fadeaway', () => {
+    const before = newPlayerState({}, 0);
+    const update = applyWorkoutToProgress(
+      { ...before, player: { ...before.player, attributes: attributesWith({}, 60) } },
+      'shooting',
+      'hard',
+      ['offDribble']
+    );
+
+    const shooting = ATTRIBUTE_CATEGORIES.find((category) => category.id === 'shooting')!;
+
+    expect(update.attributeGains.fadeaway).toBeGreaterThan(0);
+    expect(getCategoryAverage(update.state.player.attributes, shooting)).toBeGreaterThan(60);
+    expect(calculateOvr(update.state.player.attributes)).toBeGreaterThanOrEqual(
+      calculateOvr(attributesWith({}, 60))
+    );
+  });
+});

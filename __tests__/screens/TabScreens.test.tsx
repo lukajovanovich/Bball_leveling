@@ -433,6 +433,37 @@ describe('Train screen focus areas', () => {
     expect(screen.getByText('Free Throw')).toBeOnTheScreen();
   });
 
+  it('hides the focus areas of a workout that is done for today', async () => {
+    await renderApp(<TrainScreen />);
+
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Three-pointers' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Log medium workout with bonus' })
+    );
+
+    expect(screen.queryByRole('checkbox', { name: 'Three-pointers' })).not.toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: 'Shooting Workout done for today' })
+    ).toBeDisabled();
+
+    await fireEvent.press(screen.getByText('Defense Workout'));
+
+    expect(screen.getByRole('checkbox', { name: 'Perimeter defense' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Log medium workout' })).toBeEnabled();
+  });
+
+  it('keeps the result card on the logged workout and its focus after switching', async () => {
+    await renderApp(<TrainScreen />);
+
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Three-pointers' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+    await fireEvent.press(screen.getByText('Defense Workout'));
+
+    expect(screen.getByText('Shooting Workout: three-pointers')).toBeOnTheScreen();
+    expect(screen.getByText('Three-Point Shot')).toBeOnTheScreen();
+  });
+
   it('logs a pickup game that touches every category, under the same daily limit', async () => {
     signInWith(newPlayerState());
     await renderApp(<TrainScreen />);

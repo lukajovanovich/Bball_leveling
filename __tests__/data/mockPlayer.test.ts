@@ -14,7 +14,11 @@ import {
   DEFAULT_WEIGHT_KG,
   DEFAULT_WINGSPAN_CM
 } from '../../src/lib/measurements';
-import { calculateOvr, getLevelInfo } from '../../src/lib/progression';
+import {
+  calculateOvr,
+  getDailyWorkoutStatus,
+  getLevelInfo
+} from '../../src/lib/progression';
 import { PlayerProfile, ProgressState, TrainingSession } from '../../src/types';
 import { signupProfile } from '../helpers/fixtures';
 
@@ -411,6 +415,15 @@ describe('normalizeProgressState', () => {
 
       expect(broken).not.toHaveProperty('focus');
       expect(mixed.focus).toEqual(['steals']);
+    });
+
+    it('drops entries that are not sessions so the daily limit can still be read', () => {
+      const { trainingSessions } = normalizeProgressState(
+        withSessions([null, 'shooting', 7, oldSession])
+      );
+
+      expect(trainingSessions).toEqual([oldSession]);
+      expect(() => getDailyWorkoutStatus(trainingSessions)).not.toThrow();
     });
   });
 });
