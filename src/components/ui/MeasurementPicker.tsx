@@ -49,6 +49,10 @@ export const MeasurementPicker = ({
   const selectedIndex = findClosestMeasurementIndex(options, selectedValue);
   const selectedIndexRef = useRef(selectedIndex);
   selectedIndexRef.current = selectedIndex;
+  // True from a unit switch until the wheel has jumped to the new list. The
+  // scroll offset still belongs to the old list then (cm has far more rows than
+  // ft/in), so reading it would pick the wrong row, usually the last one.
+  const awaitingJumpRef = useRef(false);
 
   // Jump to the current value when the wheel opens or the unit changes. Value
   // changes made by scrolling must not scroll the wheel again, or it would
@@ -58,19 +62,39 @@ export const MeasurementPicker = ({
       return;
     }
 
-    const timeoutId = setTimeout(() => {
+    let releaseId: ReturnType<typeof setTimeout> | undefined;
+    const jumpId = setTimeout(() => {
       listRef.current?.scrollToIndex({
         index: selectedIndexRef.current,
         animated: false
       });
+      releaseId = setTimeout(() => {
+        awaitingJumpRef.current = false;
+      }, 100);
     }, 0);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(jumpId);
+      clearTimeout(releaseId);
+    };
   }, [isOpen, selectedUnit]);
+
+  const changeUnit = (unit: string) => {
+    if (unit === selectedUnit) {
+      return;
+    }
+
+    awaitingJumpRef.current = true;
+    onUnitChange(unit);
+  };
 
   const syncSelectionFromOffset = (
     event: NativeSyntheticEvent<NativeScrollEvent>
   ) => {
+    if (awaitingJumpRef.current) {
+      return;
+    }
+
     const nextIndex = Math.max(
       0,
       Math.min(options.length - 1, Math.round(event.nativeEvent.contentOffset.y / OPTION_HEIGHT))
@@ -144,7 +168,7 @@ export const MeasurementPicker = ({
                   <Pressable
                     key={option.value}
                     accessibilityRole="button"
-                    onPress={() => onUnitChange(option.value)}
+                    onPress={() => changeUnit(option.value)}
                     style={[
                       styles.unitButton,
                       selected && styles.unitButtonSelected

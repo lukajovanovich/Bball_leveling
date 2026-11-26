@@ -312,3 +312,28 @@ describe('unitsForSystemOf', () => {
     });
   });
 });
+
+describe('cm to feet and inches rounding', () => {
+  // Heights are rounded to the nearest whole inch, the way they are usually
+  // listed; a value past the half inch goes up.
+  it.each([
+    [185, '6\'1"'], // 72.83 in
+    [186, '6\'1"'], // 73.23 in
+    [187, '6\'2"'], // 73.62 in, past 6'1.5"
+    [195, '6\'5"'], // 76.77 in
+    [196, '6\'5"'], // 77.17 in
+    [198, '6\'6"'] // 77.95 in
+  ])('%s cm shows as %s', (cm, label) => {
+    expect(formatLengthMeasurement(cm, 'in')).toBe(label);
+  });
+
+  it('round-trips 6\'5" to 196 cm and back', () => {
+    const option = buildLengthOptions('in', HEIGHT_RANGE_CM).find(
+      (item) => item.label === '6\'5"'
+    );
+
+    expect(option?.value).toBe(195.58);
+    expect(formatLengthMeasurement(option!.value, 'cm')).toBe('196 cm');
+    expect(formatLengthMeasurement(196, 'in')).toBe('6\'5"');
+  });
+});

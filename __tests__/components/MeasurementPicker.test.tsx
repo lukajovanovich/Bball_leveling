@@ -124,6 +124,30 @@ describe('MeasurementPicker', () => {
     expect(screen.getAllByText('162 cm').length).toBeGreaterThan(0);
   });
 
+  it('keeps the height when switching cm to ft/in, ignoring the old scroll offset', async () => {
+    const { onValueChange } = await setup(196);
+    await openPicker();
+
+    await fireEvent.press(screen.getByText('ft/in'));
+    // the cm wheel was scrolled to row 41 (196 cm); the shorter ft/in list
+    // reports that stale offset before it jumps to the right row
+    await fireEvent.scroll(screen.getByTestId('measurement-wheel'), {
+      nativeEvent: { contentOffset: { y: OPTION_HEIGHT * 41 } }
+    });
+
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(screen.getAllByText('6\'5"').length).toBeGreaterThan(0);
+  });
+
+  it('does not treat a tap on the current unit as a switch', async () => {
+    const { onUnitChange } = await setup();
+    await openPicker();
+
+    await fireEvent.press(screen.getByText('cm'));
+
+    expect(onUnitChange).not.toHaveBeenCalled();
+  });
+
   it('selects the row the wheel stops on', async () => {
     const { onValueChange } = await setup();
     await openPicker();
