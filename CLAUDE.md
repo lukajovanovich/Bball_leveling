@@ -26,6 +26,15 @@ Run `npm run typecheck` and `npm test` before every commit. There is no linter c
 - Screen tests render the real providers through `renderApp` from `__tests__/helpers/renderApp.tsx`.
 - New game rules or bug fixes need a test that fails without the change.
 
+## Browser checks
+
+UI changes are also checked in a real browser, following the `webapp-testing` skill in `.claude/skills/`:
+
+- Run the app on web: `npm run web` (dev server, http://localhost:8081), or build once with `npx expo export -p web --output-dir <dir>` and serve that folder (single-page app: unknown paths must fall back to `index.html`).
+- Without Supabase env vars the app opens in guest mode with the sample player, which is enough for most UI checks; Google sign-in shows as disabled.
+- Drive it with Playwright (Python as in the skill, or Node's `require('playwright')` where Python Playwright is not installed), take screenshots at phone width (390 px) and check the browser console for errors.
+- React Native Web scroll views: scroll the element itself (e.g. `getByTestId('measurement-wheel')`) or move the mouse over it before `mouse.wheel`.
+
 ## Stack
 
 - Expo + expo-router (typed routes, new architecture enabled), React 19, React Native 0.83, TypeScript strict
