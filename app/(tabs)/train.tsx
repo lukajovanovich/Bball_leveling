@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { ATTRIBUTE_NAME_BY_KEY } from '../../src/data/attributes';
 import { WORKOUTS } from '../../src/data/workouts';
 import { FocusPicker } from '../../src/components/training/FocusPicker';
@@ -17,6 +19,7 @@ import {
   getWorkoutAvailability,
   getWorkoutDefinition
 } from '../../src/lib/progression';
+import { usePlan } from '../../src/store/PlanContext';
 import { useProgress } from '../../src/store/ProgressContext';
 import {
   AttributeKey,
@@ -30,6 +33,7 @@ const intensityOptions: WorkoutIntensity[] = ['light', 'medium', 'hard'];
 
 export default function TrainScreen() {
   const { logWorkout, ovr, levelInfo, state } = useProgress();
+  const { isPremium } = usePlan();
   const [selectedType, setSelectedType] = useState<WorkoutType>('shooting');
   const [focus, setFocus] = useState<string[]>([]);
   const [intensity, setIntensity] = useState<WorkoutIntensity>('medium');
@@ -89,6 +93,24 @@ export default function TrainScreen() {
         title="Log a workout"
         subtitle="Pick what you trained and how hard. Your ratings update right away."
       />
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Describe your training"
+        onPress={() => router.push('/describe')}
+        style={({ pressed }) => [styles.describe, pressed && styles.describePressed]}
+      >
+        <View style={styles.describeCopy}>
+          <View style={styles.describeTitleRow}>
+            <Text style={styles.describeTitle}>Describe your training</Text>
+            {isPremium ? null : <Text style={styles.premiumTag}>Premium</Text>}
+          </View>
+          <Text style={styles.describeText}>
+            Write what you did in your own words and the workouts get filled in for you.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </Pressable>
 
       <View style={styles.summary}>
         <View style={styles.summaryRow}>
@@ -226,6 +248,43 @@ export default function TrainScreen() {
 }
 
 const styles = StyleSheet.create({
+  describe: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg
+  },
+  describePressed: {
+    backgroundColor: colors.panel
+  },
+  describeCopy: {
+    flex: 1,
+    gap: 2
+  },
+  describeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm
+  },
+  describeTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15
+  },
+  premiumTag: {
+    color: colors.gold,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12
+  },
+  describeText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18
+  },
   summary: {
     gap: spacing.lg
   },

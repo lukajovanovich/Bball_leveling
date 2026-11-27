@@ -10,6 +10,7 @@ import { BarlowCondensed_600SemiBold } from '@expo-google-fonts/barlow-condensed
 import { BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed/700Bold';
 import { ProgressProvider } from '../src/store/ProgressContext';
 import { AuthProvider } from '../src/store/AuthContext';
+import { PlanProvider } from '../src/store/PlanContext';
 import { LevelUpModal } from '../src/components/player/LevelUpModal';
 
 export default function RootLayout() {
@@ -28,11 +29,13 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ProgressProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }} />
-        <LevelUpModal />
-      </ProgressProvider>
+      <PlanProvider>
+        <ProgressProvider>
+          <StatusBar style="light" />
+          <Stack screenOptions={{ headerShown: false }} />
+          <LevelUpModal />
+        </ProgressProvider>
+      </PlanProvider>
     </AuthProvider>
   );
 }

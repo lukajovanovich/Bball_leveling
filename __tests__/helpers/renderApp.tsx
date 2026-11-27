@@ -2,11 +2,14 @@ import React, { PropsWithChildren, ReactElement } from 'react';
 import { Text } from 'react-native';
 import { render, screen, waitFor } from '@testing-library/react-native';
 import { AuthProvider } from '../../src/store/AuthContext';
+import { PlanProvider } from '../../src/store/PlanContext';
 import { ProgressProvider, useProgress } from '../../src/store/ProgressContext';
 
 export const AppProviders = ({ children }: PropsWithChildren) => (
   <AuthProvider>
-    <ProgressProvider>{children}</ProgressProvider>
+    <PlanProvider>
+      <ProgressProvider>{children}</ProgressProvider>
+    </PlanProvider>
   </AuthProvider>
 );
 

@@ -71,6 +71,18 @@ interface ProgressContextValue {
     /** Focus option ids; leave out for a general session. */
     focus?: readonly string[]
   ) => ProgressUpdate | null;
+  /**
+   * Logs several workouts in order as one change (one save). Each entry is
+   * checked against the daily limit as it stands after the ones before it;
+   * blocked entries are skipped and returned as null.
+   */
+  logWorkouts: (
+    entries: ReadonlyArray<{
+      workoutType: WorkoutType;
+      intensity: WorkoutIntensity;
+      focus?: readonly string[];
+    }>
+  ) => (ProgressUpdate | null)[];
   updateProfile: (profile: Partial<EditableProfileFields>) => void;
   /** Resolves with an error message when the save failed, else null. */
   createNewProfile: (profile: EditableProfileFields) => Promise<string | null>;
@@ -384,6 +396,50 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
     [persistProgressState, state]
   );
 
+  const logWorkouts = useCallback<ProgressContextValue['logWorkouts']>(
+    (entries) => {
+      let current = refreshQuests(stateRef.current);
+      const updates = entries.map((entry) => {
+        const status = getDailyWorkoutStatus(current.trainingSessions);
+
+        if (getWorkoutAvailability(status, entry.workoutType) === 'locked') {
+          return null;
+        }
+
+        const update = applyWorkoutToProgress(
+          current,
+          entry.workoutType,
+          entry.intensity,
+          entry.focus
+        );
+        current = update.state;
+        return update;
+      });
+
+      // Each workout sets lastLevelUp for itself only; keep one popup that
+      // spans the whole batch, from the first level to the last.
+      const levelUps = updates.flatMap((update) => (update?.levelUp ? [update.levelUp] : []));
+
+      if (levelUps.length > 0) {
+        current = {
+          ...current,
+          lastLevelUp: {
+            previousLevel: levelUps[0].previousLevel,
+            level: levelUps[levelUps.length - 1].level
+          }
+        };
+      }
+
+      if (updates.some(Boolean)) {
+        setState(current);
+        void persistProgressState(current);
+      }
+
+      return updates;
+    },
+    [persistProgressState]
+  );
+
   const updateProfile = useCallback(
     (profile: Partial<EditableProfileFields>) => {
       const nextState: ProgressState = {
@@ -444,6 +500,7 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       syncError,
       needsPlayerSetup,
       logWorkout,
+      logWorkouts,
       updateProfile,
       createNewProfile,
       dismissLevelUp,
@@ -457,6 +514,7 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       hydratedUserId,
       isHydrating,
       logWorkout,
+      logWorkouts,
       needsPlayerSetup,
       state,
       syncError,

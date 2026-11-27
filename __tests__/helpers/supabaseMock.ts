@@ -13,6 +13,11 @@ const eq = jest.fn();
 const select = jest.fn();
 const upsert = jest.fn();
 const unsubscribe = jest.fn();
+// user_plans has its own query chain so a plan never mixes with the profile row.
+const planMaybeSingle = jest.fn();
+const planEq = jest.fn();
+const planSelect = jest.fn();
+const invoke = jest.fn();
 
 export const supabase = {
   auth: {
@@ -26,7 +31,8 @@ export const supabase = {
     startAutoRefresh: jest.fn(),
     stopAutoRefresh: jest.fn()
   },
-  from: jest.fn()
+  from: jest.fn(),
+  functions: { invoke }
 };
 
 export const makeSession = (id = 'user-1', email = 'player@example.com') => ({
@@ -52,6 +58,8 @@ export const makeGoogleSession = (
 export const GOOGLE_AUTH_URL = 'https://project.supabase.co/auth/v1/authorize?provider=google';
 
 export const mockControls = {
+  invoke,
+  planSelect,
   maybeSingle,
   eq,
   select,
@@ -87,14 +95,31 @@ export const mockControls = {
     });
   },
 
+  /** The signed-in user's row in user_plans (null: no row, i.e. free). */
+  setPlan(plan: string | null) {
+    planMaybeSingle.mockResolvedValue({
+      data: plan === null ? null : { plan },
+      error: null
+    });
+  },
+
   reset() {
     listeners.clear();
     isSupabaseConfigured = true;
 
     Object.values(supabase.auth).forEach((mock) => mock.mockReset());
-    [supabase.from, maybeSingle, eq, select, upsert, unsubscribe].forEach((mock) =>
-      mock.mockReset()
-    );
+    [
+      supabase.from,
+      maybeSingle,
+      eq,
+      select,
+      upsert,
+      unsubscribe,
+      planMaybeSingle,
+      planEq,
+      planSelect,
+      invoke
+    ].forEach((mock) => mock.mockReset());
 
     supabase.auth.getSession.mockResolvedValue({
       data: { session: null },
@@ -133,7 +158,13 @@ export const mockControls = {
     eq.mockReturnValue({ maybeSingle });
     select.mockReturnValue({ eq });
     upsert.mockResolvedValue({ error: null });
-    supabase.from.mockReturnValue({ select, upsert });
+    planMaybeSingle.mockResolvedValue({ data: null, error: null });
+    planEq.mockReturnValue({ maybeSingle: planMaybeSingle });
+    planSelect.mockReturnValue({ eq: planEq });
+    supabase.from.mockImplementation((table: string) =>
+      table === 'user_plans' ? { select: planSelect } : { select, upsert }
+    );
+    invoke.mockResolvedValue({ data: { status: 'not_configured' }, error: null });
   }
 };
 
