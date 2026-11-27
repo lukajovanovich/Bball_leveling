@@ -23,7 +23,9 @@ import {
   formatWeightMeasurement,
   unitsForSystemOf
 } from '../../src/lib/measurements';
+import { PREMIUM_PRICE_LABEL } from '../../src/lib/planStore';
 import { useAuth } from '../../src/store/AuthContext';
+import { usePlan } from '../../src/store/PlanContext';
 import { useProgress } from '../../src/store/ProgressContext';
 import { colors, fonts, radii, spacing } from '../../src/theme/theme';
 import { LengthUnit, WeightUnit } from '../../src/types';
@@ -31,6 +33,17 @@ import { LengthUnit, WeightUnit } from '../../src/types';
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { player, updateProfile, ovr, levelInfo, syncError } = useProgress();
+  const { isPremium, isLoadingPlan, changeTestPlan } = usePlan();
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+
+  const switchPlan = async (next: 'free' | 'premium') => {
+    setPlanBusy(true);
+    setPlanError(null);
+    const error = await changeTestPlan(next);
+    setPlanError(error);
+    setPlanBusy(false);
+  };
   const [saved, setSaved] = useState(false);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -123,6 +136,46 @@ export default function ProfileScreen() {
       <View style={styles.summaryRow}>
         <StatPill label="OVR" value={ovr} />
         <StatPill label="Level" value={levelInfo.level} color={colors.gold} />
+      </View>
+
+      <View style={[styles.premiumCard, isPremium && styles.premiumCardActive]}>
+        <View style={styles.premiumHeader}>
+          <Text style={styles.premiumTitle}>
+            {isPremium ? "You're on Premium" : 'Premium'}
+          </Text>
+          {isPremium ? null : <Text style={styles.premiumPrice}>{PREMIUM_PRICE_LABEL}</Text>}
+        </View>
+        <Text style={styles.premiumText}>
+          Describe your training in your own words and the workouts get filled in for you.
+        </Text>
+        {!user ? (
+          <Text style={styles.premiumNote}>Sign in to get Premium.</Text>
+        ) : isPremium ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={planBusy}
+            onPress={() => {
+              void switchPlan('free');
+            }}
+            style={({ pressed }) => [styles.planSecondary, pressed && styles.planSecondaryPressed]}
+          >
+            <Text style={styles.planSecondaryText}>
+              {planBusy ? 'Switching...' : 'Switch back to free'}
+            </Text>
+          </Pressable>
+        ) : (
+          <PrimaryButton
+            label={planBusy ? 'Upgrading...' : 'Upgrade to Premium'}
+            disabled={planBusy || isLoadingPlan}
+            onPress={() => {
+              void switchPlan('premium');
+            }}
+          />
+        )}
+        {user ? (
+          <Text style={styles.premiumNote}>Test mode: no payment is taken yet.</Text>
+        ) : null}
+        {planError ? <Text style={styles.syncError}>{planError}</Text> : null}
       </View>
 
       <View style={styles.formCard}>
@@ -327,6 +380,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.lg
+  },
+  premiumCard: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(242,207,107,0.35)',
+    padding: spacing.lg,
+    gap: spacing.md
+  },
+  premiumCardActive: {
+    borderColor: colors.border
+  },
+  premiumHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.md
+  },
+  premiumTitle: {
+    color: colors.gold,
+    fontFamily: fonts.displayBold,
+    fontSize: 26
+  },
+  premiumPrice: {
+    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: 20
+  },
+  premiumText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  premiumNote: {
+    color: colors.textSubtle,
+    fontFamily: fonts.body,
+    fontSize: 12
+  },
+  planSecondary: {
+    minHeight: 46,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  planSecondaryPressed: {
+    backgroundColor: colors.panel
+  },
+  planSecondaryText: {
+    color: colors.text,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15
   },
   formCard: {
     borderRadius: radii.xl,

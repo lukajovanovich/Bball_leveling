@@ -3,6 +3,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import DescribeTrainingScreen from '../../app/describe';
 import TrainScreen from '../../app/(tabs)/train';
+import ProfileScreen from '../../app/(tabs)/profile';
 import { LevelUpModal } from '../../src/components/player/LevelUpModal';
 import { usePlan } from '../../src/store/PlanContext';
 import { useProgress } from '../../src/store/ProgressContext';
@@ -216,5 +217,70 @@ describe('logWorkouts', () => {
 
     expect(screen.getByText('Level up')).toBeOnTheScreen();
     expect(screen.getByText(/Up from level\s+3/)).toBeOnTheScreen();
+  });
+});
+
+describe('Profile premium card (test mode)', () => {
+  // The database function writes the plan; the mock does the same so the
+  // read-back after the switch sees it.
+  const rpcSetsPlan = () =>
+    mockControls.rpc.mockImplementation(async (_name: string, args: { new_plan: string }) => {
+      mockControls.setPlan(args.new_plan);
+      return { data: args.new_plan, error: null };
+    });
+
+  it('upgrades a free player to premium and back', async () => {
+    signInWith(null);
+    rpcSetsPlan();
+    await renderApp(<ProfileScreen />);
+
+    expect(await screen.findByText('$5 a month')).toBeOnTheScreen();
+    expect(screen.getByText('Test mode: no payment is taken yet.')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Upgrade to Premium' }));
+
+    expect(mockControls.rpc).toHaveBeenCalledWith('set_test_plan', { new_plan: 'premium' });
+    expect(await screen.findByText("You're on Premium")).toBeOnTheScreen();
+    expect(screen.queryByText('$5 a month')).not.toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Switch back to free' }));
+
+    expect(mockControls.rpc).toHaveBeenLastCalledWith('set_test_plan', { new_plan: 'free' });
+    expect(await screen.findByRole('button', { name: 'Upgrade to Premium' })).toBeOnTheScreen();
+  });
+
+  it('says when test upgrades are turned off', async () => {
+    signInWith(null);
+    mockControls.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'test_upgrades_disabled' }
+    });
+    await renderApp(<ProfileScreen />);
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Upgrade to Premium' }));
+
+    expect(await screen.findByText('Upgrades are not open yet.')).toBeOnTheScreen();
+    expect(screen.queryByText("You're on Premium")).not.toBeOnTheScreen();
+  });
+
+  it('says when the database function is not added yet', async () => {
+    signInWith(null);
+    mockControls.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST202', message: 'Could not find the function' }
+    });
+    await renderApp(<ProfileScreen />);
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Upgrade to Premium' }));
+
+    expect(await screen.findByText('Upgrades are not set up yet.')).toBeOnTheScreen();
+  });
+
+  it('asks guests to sign in instead of offering the upgrade', async () => {
+    await renderApp(<ProfileScreen />);
+
+    expect(screen.getByText('Sign in to get Premium.')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Upgrade to Premium' })).not.toBeOnTheScreen();
+    expect(mockControls.rpc).not.toHaveBeenCalled();
   });
 });

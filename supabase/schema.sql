@@ -62,3 +62,48 @@ on public.ai_usage
 for select
 to authenticated
 using ((select auth.uid()) = user_id);
+
+-- Test upgrades: until real payments exist, players can switch themselves
+-- between free and premium from Profile, but only while this switch is on.
+-- Turn it off before launch:
+--   update public.app_settings set test_upgrades_enabled = false where id = 1;
+create table if not exists public.app_settings (
+  id smallint primary key default 1 check (id = 1),
+  test_upgrades_enabled boolean not null default true
+);
+
+insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+
+-- No policies: only the dashboard and the function below can read it.
+alter table public.app_settings enable row level security;
+
+create or replace function public.set_test_plan(new_plan text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not_signed_in';
+  end if;
+
+  if new_plan not in ('free', 'premium') then
+    raise exception 'unknown_plan';
+  end if;
+
+  if not coalesce((select test_upgrades_enabled from public.app_settings where id = 1), false) then
+    raise exception 'test_upgrades_disabled';
+  end if;
+
+  insert into public.user_plans (user_id, plan, updated_at)
+  values (auth.uid(), new_plan, timezone('utc', now()))
+  on conflict (user_id) do update
+    set plan = excluded.plan, updated_at = excluded.updated_at;
+
+  return new_plan;
+end;
+$$;
+
+revoke all on function public.set_test_plan(text) from public;
+grant execute on function public.set_test_plan(text) to authenticated;

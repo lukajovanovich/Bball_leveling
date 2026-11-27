@@ -18,6 +18,7 @@ const planMaybeSingle = jest.fn();
 const planEq = jest.fn();
 const planSelect = jest.fn();
 const invoke = jest.fn();
+const rpc = jest.fn();
 
 export const supabase = {
   auth: {
@@ -32,7 +33,8 @@ export const supabase = {
     stopAutoRefresh: jest.fn()
   },
   from: jest.fn(),
-  functions: { invoke }
+  functions: { invoke },
+  rpc
 };
 
 export const makeSession = (id = 'user-1', email = 'player@example.com') => ({
@@ -59,6 +61,7 @@ export const GOOGLE_AUTH_URL = 'https://project.supabase.co/auth/v1/authorize?pr
 
 export const mockControls = {
   invoke,
+  rpc,
   planSelect,
   maybeSingle,
   eq,
@@ -118,7 +121,8 @@ export const mockControls = {
       planMaybeSingle,
       planEq,
       planSelect,
-      invoke
+      invoke,
+      rpc
     ].forEach((mock) => mock.mockReset());
 
     supabase.auth.getSession.mockResolvedValue({
@@ -165,6 +169,7 @@ export const mockControls = {
       table === 'user_plans' ? { select: planSelect } : { select, upsert }
     );
     invoke.mockResolvedValue({ data: { status: 'not_configured' }, error: null });
+    rpc.mockResolvedValue({ data: null, error: null });
   }
 };
 

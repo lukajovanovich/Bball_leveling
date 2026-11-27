@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useState
 } from 'react';
-import { Plan, fetchUserPlan } from '../lib/planStore';
+import { Plan, fetchUserPlan, setTestPlan } from '../lib/planStore';
 import { useAuth } from './AuthContext';
 
 interface PlanContextValue {
@@ -15,6 +15,8 @@ interface PlanContextValue {
   isPremium: boolean;
   isLoadingPlan: boolean;
   refreshPlan: () => Promise<void>;
+  /** Test mode: switches the player's own plan; returns an error message or null. */
+  changeTestPlan: (plan: Plan) => Promise<string | null>;
 }
 
 const PlanContext = createContext<PlanContextValue | undefined>(undefined);
@@ -56,14 +58,34 @@ export const PlanProvider = ({ children }: PropsWithChildren) => {
     };
   }, [load]);
 
+  const changeTestPlan = useCallback(
+    async (nextPlan: Plan) => {
+      if (!userId || !isConfigured) {
+        return 'Sign in to change your plan.';
+      }
+
+      const { error } = await setTestPlan(nextPlan);
+
+      if (error) {
+        return error;
+      }
+
+      // Read it back so the screen shows what the database now holds.
+      await load();
+      return null;
+    },
+    [isConfigured, load, userId]
+  );
+
   const value = useMemo(
     () => ({
       plan,
       isPremium: plan === 'premium',
       isLoadingPlan,
-      refreshPlan: () => load()
+      refreshPlan: () => load(),
+      changeTestPlan
     }),
-    [isLoadingPlan, load, plan]
+    [changeTestPlan, isLoadingPlan, load, plan]
   );
 
   return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>;
