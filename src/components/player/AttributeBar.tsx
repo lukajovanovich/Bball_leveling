@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../../lib/progression';
+import { ATTRIBUTE_MAX, ATTRIBUTE_MIN, displayRating } from '../../lib/progression';
 import { colors, fonts, radii, spacing } from '../../theme/theme';
 
 interface AttributeBarProps {
@@ -19,7 +19,7 @@ export const AttributeBar = ({ name, value, color }: AttributeBarProps) => {
     <View style={styles.container}>
       <View style={styles.row}>
         <Text style={styles.name}>{name}</Text>
-        <Text style={styles.value}>{value}</Text>
+        <Text style={styles.value}>{displayRating(value)}</Text>
       </View>
       <View style={styles.track}>
         <View

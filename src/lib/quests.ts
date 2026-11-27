@@ -26,6 +26,10 @@ export const DAILY_QUEST_XP = { anyWorkout: 80, area: 100, focus: 90 };
 export const WEEKLY_QUEST_XP = { area: 220, improve: 200, total: 180 };
 export const WEEKLY_GOALS = { areaWorkouts: 3, improvePoints: 3, totalWorkouts: 5 };
 
+/** Higher ratings grow slower (GAIN_CURVE), so the weekly raise asks for less. */
+export const getWeeklyImproveGoal = (rating: number) =>
+  rating >= 80 ? 1 : rating >= 60 ? 2 : WEEKLY_GOALS.improvePoints;
+
 /** Bonus for finishing all three daily quests: base + per streak day, capped. */
 export const ALL_DAILY_BONUS = { base: 50, perStreakDay: 10, maxStreakDays: 10 };
 
@@ -282,6 +286,7 @@ export const buildWeeklyQuests = (
     candidates[Math.floor(random() * candidates.length)] ??
     getAreaAttributes(improveArea)[0];
   const areaWorkout = getWorkoutDefinition(area);
+  const improveGoal = getWeeklyImproveGoal(attributes[improveKey]);
 
   return [
     {
@@ -299,14 +304,14 @@ export const buildWeeklyQuests = (
     },
     {
       id: `weekly-${weekKey}-improve-${improveKey}`,
-      title: `Raise ${ATTRIBUTE_NAME_BY_KEY[improveKey]} by ${WEEKLY_GOALS.improvePoints}`,
+      title: `Raise ${ATTRIBUTE_NAME_BY_KEY[improveKey]} by ${improveGoal}`,
       description: 'Focused sessions move it fastest.',
       period: 'weekly',
       kind: 'improve_attribute',
       attributeKey: improveKey,
       rewardXp: WEEKLY_QUEST_XP.improve,
       progress: 0,
-      goal: WEEKLY_GOALS.improvePoints,
+      goal: improveGoal,
       completed: false,
       claimed: false
     },

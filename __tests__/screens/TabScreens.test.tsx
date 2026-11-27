@@ -182,8 +182,9 @@ describe('Build (attributes) screen', () => {
 
     // 190 workout XP + 80 quest XP crosses the 250 XP needed for level 2
     expect(readProbe()).toMatchObject({ level: 2, totalXp: 270 });
-    // both rebound ratings went from 0 to 3, so the category average is 3 too
-    expect(screen.getAllByText('3').length).toBeGreaterThanOrEqual(3);
+    // both rebound ratings went from 0 to 4.5 (3 points x1.5), shown as 4,
+    // and the category average matches the bars
+    expect(screen.getAllByText('4').length).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -271,8 +272,9 @@ describe('Train screen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
     await fireEvent.press(screen.getByText('Defense Workout'));
 
-    // Mid-Range and Three-Point both gained +2 from the shooting workout
-    screen.getAllByText('+2').forEach((gain) => {
+    // Mid-Range (70) and Three-Point (66) both gained 2 points x0.6
+    expect(screen.getAllByText('+1.2')).toHaveLength(2);
+    screen.getAllByText('+1.2').forEach((gain) => {
       expect(gain).toHaveStyle({ color: colors.green });
     });
   });
@@ -285,7 +287,7 @@ describe('Train screen', () => {
 
     await waitFor(() => expect(mockControls.upsert).toHaveBeenCalledTimes(1));
     expect(lastSavedPlayer().totalXp).toBe(readProbe().totalXp);
-    expect(lastSavedPlayer().attributes.midRangeShot).toBe(2);
+    expect(lastSavedPlayer().attributes.midRangeShot).toBe(3);
   });
 
   it('shows the level-up popup and closes it', async () => {
@@ -489,7 +491,8 @@ describe('Train screen focus areas', () => {
 
     ATTRIBUTE_CATEGORIES.forEach((category) => {
       expect(
-        category.attributes.some((attribute) => attributes[attribute.key] === 1)
+        // one point x1.5 for a rating under 30
+        category.attributes.some((attribute) => attributes[attribute.key] === 1.5)
       ).toBe(true);
     });
     expect(screen.getByText('Done today. Your bonus can repeat it.')).toBeOnTheScreen();

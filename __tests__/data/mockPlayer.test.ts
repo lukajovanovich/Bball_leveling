@@ -177,7 +177,7 @@ describe('normalizePlayerProfile', () => {
     expect(Object.keys(player.attributes)).toHaveLength(23);
   });
 
-  it('clamps stored attributes into the 0-99 range', () => {
+  it('clamps stored attributes into the 0-99 range and keeps one decimal', () => {
     const player = normalizePlayerProfile({
       attributes: {
         ...createZeroAttributes(),
@@ -189,7 +189,7 @@ describe('normalizePlayerProfile', () => {
 
     expect(player.attributes.speed).toBe(99);
     expect(player.attributes.steal).toBe(0);
-    expect(player.attributes.block).toBe(46);
+    expect(player.attributes.block).toBe(45.6);
   });
 
   it('always produces values the rest of the app can calculate with', () => {

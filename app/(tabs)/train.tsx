@@ -11,6 +11,7 @@ import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
 import {
   INTENSITY_CONFIG,
+  formatGain,
   formatWorkoutName,
   getDailyWorkoutStatus,
   getWorkoutAvailability,
@@ -200,7 +201,7 @@ export default function TrainScreen() {
               <View key={key} style={styles.gainRow}>
                 <Text style={styles.gainLabel}>{ATTRIBUTE_NAME_BY_KEY[key]}</Text>
                 <Text style={[styles.gainValue, { color: resultColor }]}>
-                  +{gain}
+                  {formatGain(gain)}
                 </Text>
               </View>
             ))}

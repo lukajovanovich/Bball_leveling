@@ -64,8 +64,19 @@ export const getWorkoutDefinition = (type: WorkoutType) => {
   return workout;
 };
 
+/** Ratings keep one decimal (shown floored); this also clamps them to 0-99. */
 export const clampAttribute = (value: number) =>
-  Math.max(ATTRIBUTE_MIN, Math.min(ATTRIBUTE_MAX, Math.round(value)));
+  Math.max(ATTRIBUTE_MIN, Math.min(ATTRIBUTE_MAX, Math.round(value * 10) / 10));
+
+/** The whole rating shown to the player. */
+export const displayRating = (value: number) => Math.floor(value + 1e-9);
+
+/** "+2" for whole gains, "+0.6" otherwise. */
+export const formatGain = (gain: number) => {
+  const rounded = Math.round(gain * 10) / 10;
+
+  return `${rounded > 0 ? '+' : ''}${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}`;
+};
 
 export const getXpNeededForLevel = (level: number) => 180 + level * 70;
 
@@ -92,8 +103,9 @@ export const getCategoryAverage = (
   attributes: PlayerAttributes,
   category: AttributeCategory
 ) => {
+  // Averages the ratings as shown (whole numbers), so it matches the bars.
   const total = category.attributes.reduce(
-    (sum, attribute) => sum + attributes[attribute.key],
+    (sum, attribute) => sum + displayRating(attributes[attribute.key]),
     0
   );
 
@@ -123,7 +135,7 @@ export const calculateOvr = (attributes: PlayerAttributes) => {
       .slice(0, 5)
       .reduce((sum, value) => sum + value, 0) / 5;
 
-  return clampAttribute(weighted * 0.94 + topSkillAverage * 0.06);
+  return Math.round(clampAttribute(weighted * 0.94 + topSkillAverage * 0.06));
 };
 
 type AttributeGains = Partial<Record<AttributeKey, number>>;
@@ -133,18 +145,66 @@ type AttributeGains = Partial<Record<AttributeKey, number>>;
 // calculateWorkoutResult.
 export const FOCUS_GAIN_MULTIPLIER = 1.5;
 
-// Ratings get harder to raise near the top: -1 from 80, at most +1 from 88,
-// and never past 99.
-const limitGain = (gain: number, currentValue: number) => {
-  let limited = gain;
+// The higher a rating, the less each training point moves it: 0 to 30 comes
+// fast, 60 to 90 takes far longer. Each band's multiplier applies from its
+// `from` rating up.
+export const GAIN_CURVE: ReadonlyArray<{ from: number; multiplier: number }> = [
+  { from: 90, multiplier: 0.2 },
+  { from: 80, multiplier: 0.35 },
+  { from: 60, multiplier: 0.6 },
+  { from: 30, multiplier: 1 },
+  { from: 0, multiplier: 1.5 }
+];
 
-  if (currentValue >= 88) {
-    limited = Math.min(limited, 1);
-  } else if (currentValue >= 80) {
-    limited = Math.max(1, limited - 1);
+export const getGainMultiplier = (rating: number) =>
+  GAIN_CURVE.find((band) => rating >= band.from)?.multiplier ?? 1;
+
+// A maxed rating earns no training points; otherwise points are left whole
+// and the curve (applyGainCurve) turns them into gains, capped at 99 there.
+const limitGain = (gain: number, currentValue: number) =>
+  currentValue >= ATTRIBUTE_MAX ? 0 : gain;
+
+/** Turns training points into rating gains on the curve, one decimal, never past 99. */
+const applyGainCurve = (points: AttributeGains, attributes: PlayerAttributes) => {
+  const gains: AttributeGains = {};
+
+  (Object.entries(points) as [AttributeKey, number][]).forEach(([key, value]) => {
+    const current = attributes[key];
+    const gain = Math.min(
+      Math.round(value * getGainMultiplier(current) * 10) / 10,
+      Math.round((ATTRIBUTE_MAX - current) * 10) / 10
+    );
+
+    if (gain > 0) {
+      gains[key] = gain;
+    }
+  });
+
+  return gains;
+};
+
+// A focused session can land on low ratings with a bigger multiplier; scale
+// it down so its total never beats the general session's.
+const capTotal = (gains: AttributeGains, budget: number) => {
+  const total = sumGains(gains);
+
+  // Sums of tenths are not exact in floating point (3.6 vs 3.5999...).
+  if (total <= budget + 1e-6 || total === 0) {
+    return gains;
   }
 
-  return Math.min(limited, Math.max(0, ATTRIBUTE_MAX - currentValue));
+  const factor = budget / total;
+  const capped: AttributeGains = {};
+
+  (Object.entries(gains) as [AttributeKey, number][]).forEach(([key, value]) => {
+    const scaled = Math.floor(value * factor * 10) / 10;
+
+    if (scaled > 0) {
+      capped[key] = scaled;
+    }
+  });
+
+  return capped;
 };
 
 const weightedGains = (
@@ -295,11 +355,15 @@ export const calculateWorkoutResult = (
   if (workout.spreadGains) {
     return {
       xpGained: config.xp,
-      attributeGains: spreadGains(workout.spreadGains[intensity], attributes)
+      attributeGains: applyGainCurve(
+        spreadGains(workout.spreadGains[intensity], attributes),
+        attributes
+      )
     };
   }
 
-  const generalGains = weightedGains(workout.effects, config.gainBase, attributes);
+  const generalPoints = weightedGains(workout.effects, config.gainBase, attributes);
+  const generalGains = applyGainCurve(generalPoints, attributes);
   const pickedFocus = normalizeWorkoutFocus(workout, focus);
 
   if (pickedFocus.length === 0) {
@@ -313,9 +377,11 @@ export const calculateWorkoutResult = (
     attributes
   );
 
+  const focusPoints = trimToBudget(focusGains, focusEffects, sumGains(generalPoints));
+
   return {
     xpGained: config.xp,
-    attributeGains: trimToBudget(focusGains, focusEffects, sumGains(generalGains))
+    attributeGains: capTotal(applyGainCurve(focusPoints, attributes), sumGains(generalGains))
   };
 };
 
@@ -412,7 +478,7 @@ const describeGains = (gains: Partial<Record<AttributeKey, number>>) => {
 
   return entries
     .slice(0, 3)
-    .map(([key, gain]) => `${ATTRIBUTE_NAME_BY_KEY[key]} +${gain}`)
+    .map(([key, gain]) => `${ATTRIBUTE_NAME_BY_KEY[key]} ${formatGain(gain)}`)
     .join(', ');
 };
 
@@ -637,8 +703,11 @@ export const getWorkoutAvailability = (
 
 export const getQuestProgressLabel = (quest: Quest) => {
   if (quest.kind === 'reach_attribute' && quest.attributeKey) {
-    return `${Math.round(quest.progress)} / ${quest.goal}`;
+    return `${displayRating(quest.progress)} / ${quest.goal}`;
   }
 
-  return `${Math.round(quest.progress)} / ${quest.goal}`;
+  // Rating gains come in tenths ("1.4 / 3"); counts stay whole numbers.
+  const rounded = Math.round(quest.progress * 10) / 10;
+
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} / ${quest.goal}`;
 };

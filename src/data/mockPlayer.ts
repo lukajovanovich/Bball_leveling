@@ -84,7 +84,7 @@ const normalizeAttributes = (
   // fadeaway starts at the average of their other two jump shots instead.
   if (typeof attributes.fadeaway !== 'number' || !Number.isFinite(attributes.fadeaway)) {
     normalizedAttributes.fadeaway = clampAttribute(
-      (normalizedAttributes.midRangeShot + normalizedAttributes.threePointShot) / 2
+      Math.round((normalizedAttributes.midRangeShot + normalizedAttributes.threePointShot) / 2)
     );
   }
 

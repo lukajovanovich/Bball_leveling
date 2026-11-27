@@ -5,6 +5,7 @@ import {
   ATTRIBUTE_MAX,
   ATTRIBUTE_MIN,
   DAILY_BONUS_WORKOUTS,
+  GAIN_CURVE,
   INTENSITY_CONFIG,
   applyWorkoutToProgress,
   calculateOvr,
@@ -14,6 +15,7 @@ import {
   formatWorkoutName,
   getCategoryAverage,
   getDailyWorkoutStatus,
+  getGainMultiplier,
   getLevelInfo,
   getLocalDayKey,
   getQuestProgressLabel,
@@ -47,10 +49,10 @@ describe('clampAttribute', () => {
     expect(clampAttribute(250)).toBe(ATTRIBUTE_MAX);
   });
 
-  it('rounds to whole numbers', () => {
-    expect(clampAttribute(49.4)).toBe(49);
-    expect(clampAttribute(49.5)).toBe(50);
-    expect(clampAttribute(98.9)).toBe(99);
+  it('keeps one decimal', () => {
+    expect(clampAttribute(49.44)).toBe(49.4);
+    expect(clampAttribute(49.46)).toBe(49.5);
+    expect(clampAttribute(98.96)).toBe(99);
   });
 });
 
@@ -209,12 +211,14 @@ describe('calculateWorkoutResult', () => {
     });
   });
 
+  // Ratings 30-59 sit on the x1 part of the gain curve, so these show the
+  // training points themselves.
   it('gives +1 to every targeted attribute on a light workout', () => {
     WORKOUTS.filter((workout) => !workout.spreadGains).forEach((workout) => {
       const { attributeGains } = calculateWorkoutResult(
         workout.type,
         'light',
-        attributesWith()
+        attributesWith({}, 40)
       );
 
       expect(Object.keys(attributeGains).sort()).toEqual(
@@ -228,7 +232,7 @@ describe('calculateWorkoutResult', () => {
     const { attributeGains } = calculateWorkoutResult(
       'shooting',
       'hard',
-      attributesWith()
+      attributesWith({}, 40)
     );
 
     expect(attributeGains).toEqual({
@@ -257,52 +261,68 @@ describe('calculateWorkoutResult', () => {
     });
   });
 
-  it('slows gains down from 80 and limits them to +1 from 88', () => {
-    const at79 = calculateWorkoutResult(
-      'shooting',
-      'hard',
-      attributesWith({ midRangeShot: 79 })
-    );
-    const at80 = calculateWorkoutResult(
-      'shooting',
-      'hard',
-      attributesWith({ midRangeShot: 80 })
-    );
-    const at88 = calculateWorkoutResult(
-      'shooting',
-      'hard',
-      attributesWith({ midRangeShot: 88 })
-    );
+  it('turns training points into smaller gains the higher the rating', () => {
+    const midRangeAt = (rating: number, intensity: WorkoutIntensity = 'hard') =>
+      calculateWorkoutResult('shooting', intensity, attributesWith({ midRangeShot: rating }, 40))
+        .attributeGains.midRangeShot;
 
-    expect(at79.attributeGains.midRangeShot).toBe(3);
-    expect(at80.attributeGains.midRangeShot).toBe(2);
-    expect(at88.attributeGains.midRangeShot).toBe(1);
+    // hard shooting = 3 points for mid-range
+    expect(midRangeAt(20)).toBe(4.5); // x1.5
+    expect(midRangeAt(40)).toBe(3); // x1
+    expect(midRangeAt(70)).toBe(1.8); // x0.6
+    expect(midRangeAt(85)).toBe(1); // x0.35 = 1.05, kept to one decimal
+    expect(midRangeAt(95)).toBe(0.6); // x0.2
+    expect(GAIN_CURVE.map((band) => band.from)).toEqual([90, 80, 60, 30, 0]);
+    [0, 29, 30, 59, 60, 79, 80, 89, 90, 99].forEach((rating, index, all) => {
+      if (index > 0) {
+        expect(getGainMultiplier(rating)).toBeLessThanOrEqual(getGainMultiplier(all[index - 1]));
+      }
+    });
   });
 
-  it('still gives at least +1 between 80 and 87 on a light workout', () => {
+  it('takes more sessions for each 30 points up the scale', () => {
+    const sessionsBetween = (from: number, to: number) => {
+      let rating = from;
+      let sessions = 0;
+
+      while (rating < to) {
+        const gain =
+          calculateWorkoutResult('shooting', 'medium', attributesWith({ midRangeShot: rating }, 40), [
+            'midRange'
+          ]).attributeGains.midRangeShot ?? 0;
+        rating = clampAttribute(rating + gain);
+        sessions += 1;
+      }
+
+      return sessions;
+    };
+
+    const low = sessionsBetween(0, 30);
+    const mid = sessionsBetween(30, 60);
+    const high = sessionsBetween(60, 90);
+
+    expect(mid).toBeGreaterThan(low);
+    expect(high).toBeGreaterThan(mid * 1.5);
+  });
+
+  it('still moves a high rating a little on a light workout', () => {
     const { attributeGains } = calculateWorkoutResult(
       'shooting',
       'light',
-      attributesWith({ midRangeShot: 85 })
+      attributesWith({ midRangeShot: 95 }, 40)
     );
 
-    expect(attributeGains.midRangeShot).toBe(1);
+    expect(attributeGains.midRangeShot).toBe(0.2);
   });
 
   it('never pushes an attribute past 99', () => {
-    const at98 = calculateWorkoutResult(
-      'shooting',
-      'hard',
-      attributesWith({ midRangeShot: 98 })
-    );
-    const at99 = calculateWorkoutResult(
-      'shooting',
-      'hard',
-      attributesWith({ midRangeShot: 99 })
-    );
+    const gainAt = (rating: number) =>
+      calculateWorkoutResult('shooting', 'hard', attributesWith({ midRangeShot: rating }, 40))
+        .attributeGains;
 
-    expect(at98.attributeGains.midRangeShot).toBe(1);
-    expect(at99.attributeGains).not.toHaveProperty('midRangeShot');
+    expect(gainAt(98).midRangeShot).toBe(0.6);
+    expect(gainAt(98.8).midRangeShot).toBe(0.2);
+    expect(gainAt(99)).not.toHaveProperty('midRangeShot');
   });
 
   it('returns no gains at all when every attribute is maxed', () => {
@@ -326,14 +346,15 @@ describe('applyWorkoutToProgress', () => {
     const update = applyWorkoutToProgress(state, 'rebounding', 'medium');
 
     expect(update.workoutXpGained).toBe(120);
+    // 2, 2 and 1 training points, x1.5 for ratings under 30
     expect(update.attributeGains).toEqual({
-      offensiveRebound: 2,
-      defensiveRebound: 2,
-      strength: 1
+      offensiveRebound: 3,
+      defensiveRebound: 3,
+      strength: 1.5
     });
-    expect(update.state.player.attributes.offensiveRebound).toBe(2);
-    expect(update.state.player.attributes.defensiveRebound).toBe(2);
-    expect(update.state.player.attributes.strength).toBe(1);
+    expect(update.state.player.attributes.offensiveRebound).toBe(3);
+    expect(update.state.player.attributes.defensiveRebound).toBe(3);
+    expect(update.state.player.attributes.strength).toBe(1.5);
     expect(update.state.player.attributes.speed).toBe(0);
   });
 
@@ -429,7 +450,8 @@ describe('applyWorkoutToProgress', () => {
       accentColor: workout.accentColor
     });
     expect(attributeItem?.title).toBe('Attributes improved');
-    expect(attributeItem?.description).toContain('Strength +2');
+    expect(attributeItem?.description).toContain('Strength +3');
+    expect(attributeItem?.description).toContain('+1.5');
   });
 
   it('explains when nothing can improve because ratings are capped', () => {
@@ -537,10 +559,11 @@ describe('applyWorkoutToProgress', () => {
     });
 
     it('completes improve-attribute quests by the amount gained', () => {
-      const light = applyWorkoutToProgress(newPlayerState(), 'athletic', 'light');
+      const light = applyWorkoutToProgress(newPlayerState({}, 0), 'athletic', 'light');
 
+      // 1 point x1.5 under 30
       expect(findQuest(light.state, 'weekly-stamina-up')).toMatchObject({
-        progress: 1,
+        progress: 1.5,
         completed: false
       });
 
@@ -581,7 +604,7 @@ describe('applyWorkoutToProgress', () => {
 
     it('completes reach-attribute quests when the rating gets there', () => {
       const update = applyWorkoutToProgress(
-        newPlayerState({ ballHandle: 74 }),
+        newPlayerState({ ballHandle: 74.5 }),
         'ballHandling',
         'light'
       );
@@ -815,11 +838,12 @@ describe('focus areas', () => {
       ids.filter((__, bit) => (index + 1) & (1 << bit))
     );
 
+  // Ratings at 40 sit on the x1 part of the gain curve.
   it('only raises perimeter defense when that is all the player worked on', () => {
     const { attributeGains } = calculateWorkoutResult(
       'defense',
       'hard',
-      attributesWith(),
+      attributesWith({}, 40),
       ['perimeter']
     );
 
@@ -830,8 +854,8 @@ describe('focus areas', () => {
   });
 
   it('puts more into a focused rating than a general session does', () => {
-    const general = calculateWorkoutResult('defense', 'hard', attributesWith());
-    const focused = calculateWorkoutResult('defense', 'hard', attributesWith(), [
+    const general = calculateWorkoutResult('defense', 'hard', attributesWith({}, 40));
+    const focused = calculateWorkoutResult('defense', 'hard', attributesWith({}, 40), [
       'perimeter'
     ]);
 
@@ -841,7 +865,7 @@ describe('focus areas', () => {
   });
 
   it('keeps the general session unchanged when no focus is picked', () => {
-    const general = calculateWorkoutResult('defense', 'hard', attributesWith());
+    const general = calculateWorkoutResult('defense', 'hard', attributesWith({}, 40));
 
     expect(general.attributeGains).toEqual({
       interiorDefense: 2,
@@ -850,11 +874,11 @@ describe('focus areas', () => {
       block: 1
     });
     expect(
-      calculateWorkoutResult('defense', 'hard', attributesWith(), []).attributeGains
+      calculateWorkoutResult('defense', 'hard', attributesWith({}, 40), []).attributeGains
     ).toEqual(general.attributeGains);
     // ids that belong to another workout (or to nothing) are ignored
     expect(
-      calculateWorkoutResult('defense', 'hard', attributesWith(), ['threePointers', 'x'])
+      calculateWorkoutResult('defense', 'hard', attributesWith({}, 40), ['threePointers', 'x'])
         .attributeGains
     ).toEqual(general.attributeGains);
   });
@@ -863,7 +887,7 @@ describe('focus areas', () => {
     const { attributeGains } = calculateWorkoutResult(
       'shooting',
       'medium',
-      attributesWith(),
+      attributesWith({}, 40),
       ['threePointers', 'offDribble']
     );
 
@@ -896,7 +920,7 @@ describe('focus areas', () => {
             );
 
             expect(total(attributeGains)).toBeLessThanOrEqual(
-              total(general.attributeGains)
+              total(general.attributeGains) + 1e-6
             );
             expect(total(attributeGains)).toBeGreaterThan(0);
             Object.keys(attributeGains).forEach((key) => {
@@ -912,12 +936,12 @@ describe('focus areas', () => {
     const { attributeGains } = calculateWorkoutResult(
       'shooting',
       'hard',
-      attributesWith(),
+      attributesWith({}, 40),
       ['midRange', 'threePointers', 'freeThrows', 'catchAndShoot', 'offDribble']
     );
 
     // the general hard shooting session gives 3 + 3 + 2 + 1 + 1
-    expect(total(attributeGains)).toBe(10);
+    expect(total(attributeGains)).toBeCloseTo(10, 5);
     (['midRangeShot', 'threePointShot', 'freeThrow', 'fadeaway'] as AttributeKey[]).forEach(
       (key) => {
         expect(attributeGains[key]).toBeGreaterThan(0);
@@ -929,11 +953,12 @@ describe('focus areas', () => {
     const { attributeGains } = calculateWorkoutResult(
       'defense',
       'hard',
-      attributesWith({ perimeterDefense: 90 }),
+      attributesWith({ perimeterDefense: 90 }, 40),
       ['perimeter']
     );
 
-    expect(attributeGains).toEqual({ perimeterDefense: 1 });
+    // 4 focused points x0.2 from 90
+    expect(attributeGains).toEqual({ perimeterDefense: 0.8 });
   });
 
   it('stores the picked focus on the session in definition order', () => {
@@ -1003,12 +1028,13 @@ describe('pickup game', () => {
     });
   });
 
-  it('moves each rating by only +1', () => {
+  it('moves each rating by only one training point', () => {
     INTENSITIES.forEach((intensity) => {
+      // 40 sits on the x1 part of the gain curve
       const { attributeGains } = calculateWorkoutResult(
         'game',
         intensity,
-        attributesWith()
+        attributesWith({}, 40)
       );
 
       Object.values(attributeGains).forEach((gain) => expect(gain).toBe(1));
@@ -1026,8 +1052,9 @@ describe('pickup game', () => {
       attributesWith({ block: 10, offensiveRebound: 12 }, 50)
     );
 
-    expect(attributeGains.block).toBe(1);
-    expect(attributeGains.offensiveRebound).toBe(1);
+    // one point each, x1.5 under 30
+    expect(attributeGains.block).toBe(1.5);
+    expect(attributeGains.offensiveRebound).toBe(1.5);
     expect(attributeGains).not.toHaveProperty('steal');
   });
 
@@ -1105,9 +1132,12 @@ describe('focus and pickup games on uneven ratings', () => {
               focus
             );
 
-            expect(total(attributeGains)).toBeLessThanOrEqual(total(general.attributeGains));
+            expect(total(attributeGains)).toBeLessThanOrEqual(
+              total(general.attributeGains) + 1e-6
+            );
             Object.entries(attributeGains).forEach(([key, gain]) => {
-              expect(gain).toBeGreaterThanOrEqual(1);
+              // the curve shrinks gains near the top, but never to nothing
+              expect(gain).toBeGreaterThanOrEqual(0.1);
               expect(attributes[key as AttributeKey] + gain!).toBeLessThanOrEqual(
                 ATTRIBUTE_MAX
               );
@@ -1192,11 +1222,15 @@ describe('quests with focused sessions and pickup games', () => {
       ['handles']
     );
 
-    expect(update.state.player.attributes.ballHandle).toBe(74);
+    // 4 focused points x0.6 from 70
+    expect(update.state.player.attributes.ballHandle).toBe(72.4);
     expect(findQuest(update.state, 'weekly-ball-handle-75')).toMatchObject({
-      progress: 74,
+      progress: 72.4,
       completed: false
     });
+    expect(getQuestProgressLabel(findQuest(update.state, 'weekly-ball-handle-75'))).toBe(
+      '72 / 75'
+    );
   });
 });
 

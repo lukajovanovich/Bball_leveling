@@ -290,7 +290,8 @@ describe('saving a signed-in player', () => {
     const saved = savedState();
 
     expect(saved.trainingSessions[0].focus).toEqual(['perimeter']);
-    expect(saved.player.attributes.perimeterDefense).toBe(4);
+    // 4 focused points x1.5 for a rating under 30
+    expect(saved.player.attributes.perimeterDefense).toBe(6);
     expect(saved.player.attributes.interiorDefense).toBe(0);
   });
 
@@ -308,7 +309,7 @@ describe('saving a signed-in player', () => {
     });
     expect(savedState().player.totalXp).toBe(result.current.progress.player.totalXp);
     expect(savedState().trainingSessions).toHaveLength(1);
-    expect(savedState().player.attributes.stamina).toBe(3);
+    expect(savedState().player.attributes.stamina).toBe(4.5);
   });
 
   it('returns the workout result and updates OVR and level', async () => {
@@ -340,9 +341,9 @@ describe('saving a signed-in player', () => {
       result.current.progress.logWorkout('strength', 'light');
     });
 
-    expect(result.current.progress.player.attributes.strength).toBe(2);
+    expect(result.current.progress.player.attributes.strength).toBe(3);
     expect(result.current.progress.state.trainingSessions).toHaveLength(2);
-    expect(savedState(1).player.attributes.strength).toBe(2);
+    expect(savedState(1).player.attributes.strength).toBe(3);
   });
 
   it('closes the level-up popup without saving again', async () => {
