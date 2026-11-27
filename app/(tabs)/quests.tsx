@@ -1,16 +1,22 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { QuestCard } from '../../src/components/player/QuestCard';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { ScreenHeader } from '../../src/components/ui/ScreenHeader';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { StatPill } from '../../src/components/ui/StatPill';
-import { getAllDailyBonusXp, getCurrentStreak } from '../../src/lib/quests';
+import {
+  REST_DAYS_PER_WEEK,
+  getAllDailyBonusXp,
+  getCurrentStreak,
+  getRestDayStatus
+} from '../../src/lib/quests';
 import { useProgress } from '../../src/store/ProgressContext';
-import { colors, spacing } from '../../src/theme/theme';
+import { colors, fonts, radii, spacing } from '../../src/theme/theme';
 
 export default function QuestsScreen() {
-  const { state } = useProgress();
+  const { state, takeRestDay, cancelRestDay } = useProgress();
+  const rest = getRestDayStatus(state);
   const daily = state.quests.filter((quest) => quest.period === 'daily');
   const weekly = state.quests.filter((quest) => quest.period === 'weekly');
   const completed = state.quests.filter((quest) => quest.completed).length;
@@ -39,16 +45,58 @@ export default function QuestsScreen() {
           <StatPill label="XP left to earn" value={availableXp} color={colors.gold} />
           <StatPill
             label="All 3 today"
-            value={dailyDone === daily.length && daily.length > 0 ? 'Done' : `+${getAllDailyBonusXp(bonusStreak)} XP`}
+            value={
+              dailyDone === daily.length && daily.length > 0
+                ? 'Done'
+                : `+${getAllDailyBonusXp(bonusStreak)} XP`
+            }
             color={colors.gold}
           />
         </View>
       </View>
 
+      <View style={styles.restPanel}>
+        <View style={styles.restCopy}>
+          <Text style={styles.restTitle}>
+            {rest.restingToday ? 'Rest day today' : 'Rest day'}
+          </Text>
+          <Text style={styles.restText}>
+            {rest.restingToday
+              ? 'No quests today, nothing lost, your streak holds. Training today gives the rest day back.'
+              : rest.usedThisWeek >= REST_DAYS_PER_WEEK
+                ? 'Used this week. You get a new one on Monday.'
+                : 'Once a week: skip the quests for a day without losing anything. Your streak holds but does not grow.'}
+          </Text>
+        </View>
+        {rest.restingToday ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={cancelRestDay}
+            style={({ pressed }) => [styles.restButton, pressed && styles.restButtonPressed]}
+          >
+            <Text style={styles.restButtonText}>Cancel</Text>
+          </Pressable>
+        ) : rest.canRest ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              takeRestDay();
+            }}
+            style={({ pressed }) => [styles.restButton, pressed && styles.restButtonPressed]}
+          >
+            <Text style={styles.restButtonText}>Take today off</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       <View style={styles.section}>
         <SectionHeader
           title="Daily"
-          subtitle="Unfinished quests cost ratings at midnight."
+          subtitle={
+            rest.restingToday
+              ? 'Resting today: unfinished quests cost nothing.'
+              : 'Unfinished quests cost ratings at midnight.'
+          }
         />
         <View style={styles.stack}>
           {daily.map((quest) => (
@@ -70,6 +118,47 @@ export default function QuestsScreen() {
 }
 
 const styles = StyleSheet.create({
+  restPanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg
+  },
+  restCopy: {
+    flex: 1,
+    gap: 2
+  },
+  restTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15
+  },
+  restText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18
+  },
+  restButton: {
+    minHeight: 40,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  restButtonPressed: {
+    backgroundColor: colors.panel
+  },
+  restButtonText: {
+    color: colors.text,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14
+  },
   summary: {
     gap: spacing.lg
   },

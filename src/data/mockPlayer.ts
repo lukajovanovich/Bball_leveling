@@ -298,7 +298,8 @@ const normalizeQuestCycle = (cycle: unknown): QuestCycle | undefined => {
       typeof value.streak === 'number' && Number.isFinite(value.streak)
         ? Math.max(0, Math.floor(value.streak))
         : 0,
-    lastActiveDay: isDayKey(value.lastActiveDay) ? value.lastActiveDay : null
+    lastActiveDay: isDayKey(value.lastActiveDay) ? value.lastActiveDay : null,
+    ...(Array.isArray(value.restDays) ? { restDays: value.restDays.filter(isDayKey) } : {})
   };
 };
 

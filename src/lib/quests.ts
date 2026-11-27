@@ -35,6 +35,8 @@ export const MISSED_DAY_XP_PENALTY = 100;
 export const MISSED_QUEST_ATTRIBUTE_PENALTY = 1;
 /** Coming back after a long break only settles this many missed days. */
 export const MAX_PENALIZED_DAYS = 3;
+/** Rest days per week: no quests needed, no penalties, the streak holds. */
+export const REST_DAYS_PER_WEEK = 1;
 
 /** The seven training areas; the Pickup Game is not an area. */
 export const QUEST_AREAS: WorkoutType[] = [
@@ -360,17 +362,104 @@ export const describeQuestPenalty = (quest: Quest): string | null => {
   return null;
 };
 
-/** The streak as it stands today: it only counts if today or yesterday was active. */
+const isRestDay = (cycle: QuestCycle, dayKey: string) =>
+  (cycle.restDays ?? []).includes(dayKey);
+
+/**
+ * Whether the streak reaches `dayKey`: every day after the last active day and
+ * before `dayKey` must have been a rest day.
+ */
+const streakReaches = (cycle: QuestCycle, dayKey: string) => {
+  if (!cycle.lastActiveDay || cycle.lastActiveDay >= dayKey) {
+    return Boolean(cycle.lastActiveDay);
+  }
+
+  for (let day = addDays(cycle.lastActiveDay, 1); day < dayKey; day = addDays(day, 1)) {
+    if (!isRestDay(cycle, day)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+/** The streak as it stands today: still alive if no day since the last active one was simply skipped. */
 export const getCurrentStreak = (cycle: QuestCycle | undefined, now: Date = new Date()) => {
   if (!cycle?.lastActiveDay) {
     return 0;
   }
 
+  return streakReaches(cycle, getLocalDayKey(now)) ? cycle.streak : 0;
+};
+
+export interface RestDayStatus {
+  restingToday: boolean;
+  usedThisWeek: number;
+  /** A rest day can be taken now: none left unused this week, no daily quest done today. */
+  canRest: boolean;
+}
+
+export const getRestDayStatus = (
+  state: ProgressState,
+  now: Date = new Date()
+): RestDayStatus => {
+  const cycle = state.questCycle;
+  const today = getLocalDayKey(now);
+  const thisWeek = getLocalWeekKey(now);
+  const restDays = cycle?.restDays ?? [];
+  const usedThisWeek = restDays.filter(
+    (day) => getLocalWeekKey(parseDayKey(day)) === thisWeek
+  ).length;
+  const restingToday = restDays.includes(today);
+  const anyDailyDone = state.quests.some(
+    (quest) => quest.period === 'daily' && isQuestDone(quest)
+  );
+
+  return {
+    restingToday,
+    usedThisWeek,
+    canRest:
+      Boolean(cycle) &&
+      cycle?.dayKey === today &&
+      !restingToday &&
+      !anyDailyDone &&
+      usedThisWeek < REST_DAYS_PER_WEEK
+  };
+};
+
+/** Takes today off. Returns the same state when a rest day is not allowed now. */
+export const takeRestDay = (state: ProgressState, now: Date = new Date()): ProgressState => {
+  if (!state.questCycle || !getRestDayStatus(state, now).canRest) {
+    return state;
+  }
+
   const today = getLocalDayKey(now);
 
-  return cycle.lastActiveDay === today || cycle.lastActiveDay === addDays(today, -1)
-    ? cycle.streak
-    : 0;
+  return {
+    ...state,
+    questCycle: {
+      ...state.questCycle,
+      // Older rest days only matter for this week's count and recent streaks.
+      restDays: [...(state.questCycle.restDays ?? []), today].slice(-8)
+    }
+  };
+};
+
+/** Gives today's rest day back (also happens on its own when a workout is logged). */
+export const cancelRestDay = (state: ProgressState, now: Date = new Date()): ProgressState => {
+  const today = getLocalDayKey(now);
+
+  if (!state.questCycle || !isRestDay(state.questCycle, today)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    questCycle: {
+      ...state.questCycle,
+      restDays: (state.questCycle.restDays ?? []).filter((day) => day !== today)
+    }
+  };
 };
 
 export const getAllDailyBonusXp = (streak: number) =>
@@ -392,12 +481,15 @@ export const applyDailyQuestOutcome = (
   const dailyAfter = questsAfter.filter((quest) => quest.period === 'daily');
   const doneBefore = dailyBefore.filter(isQuestDone).length;
   const doneAfter = dailyAfter.filter(isQuestDone).length;
-  let nextCycle = cycle;
+  // Training on a rest day gives the rest day back for later in the week.
+  let nextCycle: QuestCycle = isRestDay(cycle, today)
+    ? { ...cycle, restDays: (cycle.restDays ?? []).filter((day) => day !== today) }
+    : cycle;
 
   if (doneAfter > 0 && cycle.lastActiveDay !== today) {
-    const continues = cycle.lastActiveDay === addDays(today, -1);
+    const continues = streakReaches(nextCycle, today);
     nextCycle = {
-      ...cycle,
+      ...nextCycle,
       streak: continues ? cycle.streak + 1 : 1,
       lastActiveDay: today
     };
@@ -538,6 +630,11 @@ export const refreshQuests = (state: ProgressState, now: Date = new Date()): Pro
     const missedDays: MissedDay[] = [];
 
     for (let day = firstDay; day < today; day = addDays(day, 1)) {
+      // A rest day costs nothing.
+      if (isRestDay(cycle, day)) {
+        continue;
+      }
+
       missedDays.push({
         dayKey: day,
         quests: day === cycle.dayKey ? state.quests : buildDailyQuests(player, day)
@@ -566,8 +663,9 @@ export const refreshQuests = (state: ProgressState, now: Date = new Date()): Pro
       }
     });
 
-    // The streak survives only if yesterday had a quest done.
-    if (cycle.lastActiveDay !== addDays(today, -1)) {
+    // The streak survives only if every day since the last active one was
+    // a rest day.
+    if (!streakReaches(cycle, today)) {
       streak = 0;
     }
   }

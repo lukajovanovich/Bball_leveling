@@ -154,6 +154,8 @@ export interface QuestCycle {
   streak: number;
   /** Last day a daily quest was done, or null. */
   lastActiveDay: string | null;
+  /** Days taken off with the weekly rest day: no penalties, the streak holds. */
+  restDays?: string[];
 }
 
 export type ActivityLogType = 'workout' | 'quest' | 'attribute' | 'level' | 'penalty';

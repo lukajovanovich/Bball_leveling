@@ -27,7 +27,7 @@ import {
   fetchPlayerProgressState,
   upsertPlayerProgressState
 } from '../lib/playerProfileStore';
-import { refreshQuests } from '../lib/quests';
+import { cancelRestDay, refreshQuests, takeRestDay } from '../lib/quests';
 import {
   applyWorkoutToProgress,
   calculateOvr,
@@ -75,6 +75,9 @@ interface ProgressContextValue {
   /** Resolves with an error message when the save failed, else null. */
   createNewProfile: (profile: EditableProfileFields) => Promise<string | null>;
   dismissLevelUp: () => void;
+  /** Takes today off with the weekly rest day; false when not allowed now. */
+  takeRestDay: () => boolean;
+  cancelRestDay: () => void;
 }
 
 const ProgressContext = createContext<ProgressContextValue | undefined>(undefined);
@@ -340,6 +343,29 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
     };
   }, [isHydrating, needsPlayerSetup, persistProgressState]);
 
+  const takeTodayOff = useCallback(() => {
+    const current = refreshQuests(stateRef.current);
+    const next = takeRestDay(current);
+
+    if (next === current) {
+      return false;
+    }
+
+    setState(next);
+    void persistProgressState(next);
+    return true;
+  }, [persistProgressState]);
+
+  const cancelTodayOff = useCallback(() => {
+    const current = refreshQuests(stateRef.current);
+    const next = cancelRestDay(current);
+
+    if (next !== current) {
+      setState(next);
+      void persistProgressState(next);
+    }
+  }, [persistProgressState]);
+
   const logWorkout = useCallback(
     (workoutType: WorkoutType, intensity: WorkoutIntensity, focus?: readonly string[]) => {
       const status = getDailyWorkoutStatus(state.trainingSessions);
@@ -420,9 +446,12 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       logWorkout,
       updateProfile,
       createNewProfile,
-      dismissLevelUp
+      dismissLevelUp,
+      takeRestDay: takeTodayOff,
+      cancelRestDay: cancelTodayOff
     }),
     [
+      cancelTodayOff,
       createNewProfile,
       dismissLevelUp,
       hydratedUserId,
@@ -431,6 +460,7 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
       needsPlayerSetup,
       state,
       syncError,
+      takeTodayOff,
       updateProfile,
       user
     ]

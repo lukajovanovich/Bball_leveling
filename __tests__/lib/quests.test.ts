@@ -6,6 +6,10 @@ import {
   MAX_PENALIZED_DAYS,
   MISSED_DAY_XP_PENALTY,
   QUEST_AREAS,
+  REST_DAYS_PER_WEEK,
+  cancelRestDay,
+  getRestDayStatus,
+  takeRestDay,
   addDays,
   buildDailyQuests,
   buildWeeklyQuests,
@@ -454,5 +458,76 @@ describe('saved quest cycles', () => {
 
   it('uses the local day for the cycle', () => {
     expect(createQuestCycle(THURSDAY).dayKey).toBe(getLocalDayKey(THURSDAY));
+  });
+});
+
+describe('weekly rest day', () => {
+  it('allows one rest day a week', () => {
+    expect(REST_DAYS_PER_WEEK).toBe(1);
+  });
+
+  it('costs nothing and keeps the streak without growing it', () => {
+    const wednesday = at(25);
+    const active = complete(rotatingState(wednesday), ['complete_workouts'], wednesday);
+    const thursday = refreshQuests(active, THURSDAY);
+
+    expect(getRestDayStatus(thursday, THURSDAY).canRest).toBe(true);
+    const resting = takeRestDay(thursday, THURSDAY);
+    expect(getRestDayStatus(resting, THURSDAY)).toMatchObject({ restingToday: true, canRest: false });
+
+    const friday = refreshQuests(resting, at(27));
+    expect(friday.player.attributes).toEqual(resting.player.attributes);
+    expect(friday.player.totalXp).toBe(resting.player.totalXp);
+    // nothing new since Thursday (Wednesday's own misses were settled then)
+    expect(friday.activityLog).toEqual(resting.activityLog);
+    expect(getCurrentStreak(friday.questCycle, at(27))).toBe(1);
+
+    const fridayDone = complete(friday, ['complete_workouts'], at(27));
+    expect(fridayDone.questCycle?.streak).toBe(2);
+  });
+
+  it('allows only one per week, and a new one from Monday', () => {
+    const resting = takeRestDay(rotatingState(at(24)), at(24));
+    const nextDay = refreshQuests(resting, at(25));
+
+    expect(getRestDayStatus(nextDay, at(25))).toMatchObject({ usedThisWeek: 1, canRest: false });
+    expect(takeRestDay(nextDay, at(25))).toBe(nextDay);
+
+    const monday = refreshQuests(nextDay, at(30));
+    expect(getRestDayStatus(monday, at(30)).canRest).toBe(true);
+  });
+
+  it('is not offered once a daily quest is done today', () => {
+    const state = complete(rotatingState(THURSDAY), ['complete_workouts'], THURSDAY);
+
+    expect(getRestDayStatus(state, THURSDAY).canRest).toBe(false);
+    expect(takeRestDay(state, THURSDAY)).toBe(state);
+  });
+
+  it('gives the rest day back when the player trains or cancels it', () => {
+    const resting = takeRestDay(rotatingState(THURSDAY), THURSDAY);
+
+    expect(getRestDayStatus(cancelRestDay(resting, THURSDAY), THURSDAY)).toMatchObject({
+      restingToday: false,
+      usedThisWeek: 0,
+      canRest: true
+    });
+
+    const trained = applyWorkoutToProgress(resting, 'game', 'light', [], THURSDAY).state;
+    expect(getRestDayStatus(trained, THURSDAY)).toMatchObject({ restingToday: false, usedThisWeek: 0 });
+    expect(trained.questCycle?.streak).toBe(1);
+  });
+
+  it('does not protect a missed day that was not taken as rest', () => {
+    const wednesday = at(25);
+    const active = complete(rotatingState(wednesday), ['complete_workouts'], wednesday);
+    // Thursday rest, Friday simply missed
+    const resting = takeRestDay(refreshQuests(active, THURSDAY), THURSDAY);
+    const friday = refreshQuests(resting, at(27));
+    const saturday = refreshQuests(friday, at(28));
+
+    expect(saturday.questCycle?.streak).toBe(0);
+    expect(saturday.activityLog.length - friday.activityLog.length).toBe(1);
+    expect(saturday.activityLog[0].title).toMatch(/Nov 27|27/);
   });
 });

@@ -530,6 +530,22 @@ describe('Quests screen with rotating quests', () => {
     expect(screen.getByText(state.quests[2].title)).toBeOnTheScreen();
   });
 
+  it('takes today off from the Quests screen and can cancel it', async () => {
+    signInWith(rotating());
+    await renderApp(<QuestsScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Take today off' }));
+
+    expect(screen.getByText('Rest day today')).toBeOnTheScreen();
+    expect(screen.getByText('Resting today: unfinished quests cost nothing.')).toBeOnTheScreen();
+    expect(lastSavedState().questCycle.restDays).toHaveLength(1);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByRole('button', { name: 'Take today off' })).toBeOnTheScreen();
+    expect(lastSavedState().questCycle.restDays).toHaveLength(0);
+  });
+
   it('completes the any-workout quest from the Train screen and starts the streak', async () => {
     signInWith(rotating());
     await renderApp(
