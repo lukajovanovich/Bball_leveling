@@ -4,9 +4,15 @@ import {
   PlayerAttributes,
   PlayerProfile,
   ProgressState,
+  QuestCycle,
   TrainingSession
 } from '../types';
 import { createInitialQuests } from './quests';
+import {
+  buildDailyQuests,
+  buildWeeklyQuests,
+  createQuestCycle
+} from '../lib/quests';
 import { colors } from '../theme/theme';
 import { ATTRIBUTE_CATEGORIES } from './attributes';
 import { PLAYER_ARCHETYPES, PLAYER_POSITIONS } from './playerOptions';
@@ -254,16 +260,45 @@ const createNewPlayerActivityLog = (playerName: string): ActivityLogItem[] => [
 ];
 
 export const createProgressStateFromPlayer = (
-  player: PlayerProfile
+  player: PlayerProfile,
+  now: Date = new Date()
 ): ProgressState => {
   const normalizedPlayer = normalizePlayerProfile(player);
+  const questCycle = createQuestCycle(now);
 
   return {
     player: normalizedPlayer,
-    quests: createInitialQuests(normalizedPlayer.attributes),
+    quests: [
+      ...buildDailyQuests(normalizedPlayer, questCycle.dayKey),
+      ...buildWeeklyQuests(normalizedPlayer, questCycle.weekKey)
+    ],
     trainingSessions: [],
     activityLog: createNewPlayerActivityLog(normalizedPlayer.name),
-    lastLevelUp: null
+    lastLevelUp: null,
+    questCycle
+  };
+};
+
+const isDayKey = (value: unknown): value is string =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+// A cycle that is not readable is dropped; the next quest refresh then starts
+// a fresh one without settling (punishing) anything.
+const normalizeQuestCycle = (cycle: unknown): QuestCycle | undefined => {
+  const value = cycle as Partial<QuestCycle> | null | undefined;
+
+  if (!value || !isDayKey(value.dayKey) || !isDayKey(value.weekKey)) {
+    return undefined;
+  }
+
+  return {
+    dayKey: value.dayKey,
+    weekKey: value.weekKey,
+    streak:
+      typeof value.streak === 'number' && Number.isFinite(value.streak)
+        ? Math.max(0, Math.floor(value.streak))
+        : 0,
+    lastActiveDay: isDayKey(value.lastActiveDay) ? value.lastActiveDay : null
   };
 };
 
@@ -302,14 +337,18 @@ export const normalizeProgressState = (
           .map(normalizeTrainingSession)
       : [],
     activityLog: Array.isArray(state?.activityLog) ? state.activityLog : [],
-    lastLevelUp: state?.lastLevelUp ?? null
+    lastLevelUp: state?.lastLevelUp ?? null,
+    questCycle: normalizeQuestCycle(state?.questCycle)
   };
 };
 
-export const createInitialProgressState = (): ProgressState => ({
+// The guest sample keeps its fixed showcase quests for today; they rotate
+// like everyone else's from the next day on.
+export const createInitialProgressState = (now: Date = new Date()): ProgressState => ({
   player: samplePlayer,
   quests: createInitialQuests(samplePlayer.attributes),
   trainingSessions: [],
   activityLog: initialActivityLog,
-  lastLevelUp: null
+  lastLevelUp: null,
+  questCycle: createQuestCycle(now)
 });

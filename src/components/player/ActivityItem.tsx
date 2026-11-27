@@ -8,7 +8,8 @@ const iconByType: Record<ActivityLogItem['type'], keyof typeof Ionicons.glyphMap
   workout: 'basketball-outline',
   quest: 'flag-outline',
   attribute: 'trending-up',
-  level: 'star-outline'
+  level: 'star-outline',
+  penalty: 'trending-down'
 };
 
 // Colored by kind of entry rather than by the color stored on old log items,
@@ -17,7 +18,8 @@ const colorByType: Record<ActivityLogItem['type'], string> = {
   workout: colors.court,
   quest: colors.gold,
   attribute: colors.textMuted,
-  level: colors.gold
+  level: colors.gold,
+  penalty: colors.red
 };
 
 interface ActivityItemProps {

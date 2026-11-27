@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getQuestProgressLabel } from '../../lib/progression';
+import { describeQuestPenalty } from '../../lib/quests';
 import { Quest } from '../../types';
 import { colors, fonts, radii, spacing } from '../../theme/theme';
 import { XPBar } from '../ui/XPBar';
@@ -12,6 +13,7 @@ interface QuestCardProps {
 
 export const QuestCard = ({ quest }: QuestCardProps) => {
   const isComplete = quest.completed && quest.claimed;
+  const penalty = isComplete ? null : describeQuestPenalty(quest);
 
   return (
     <View style={styles.card}>
@@ -39,6 +41,7 @@ export const QuestCard = ({ quest }: QuestCardProps) => {
         label={isComplete ? 'Completed' : getQuestProgressLabel(quest)}
         showValue={false}
       />
+      {penalty ? <Text style={styles.penalty}>{penalty}</Text> : null}
     </View>
   );
 };
@@ -85,6 +88,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displayBold,
     fontSize: 22,
     lineHeight: 24
+  },
+  penalty: {
+    color: colors.textSubtle,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12
   },
   rewardUnit: {
     fontFamily: fonts.display,

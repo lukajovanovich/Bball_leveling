@@ -124,7 +124,9 @@ export type QuestKind =
   | 'complete_workouts'
   | 'complete_workout_type'
   | 'reach_attribute'
-  | 'improve_attribute';
+  | 'improve_attribute'
+  /** A session of `workoutType` whose focus includes `focusId`. */
+  | 'complete_focus';
 
 export interface Quest {
   id: string;
@@ -139,9 +141,22 @@ export interface Quest {
   claimed: boolean;
   workoutType?: WorkoutType;
   attributeKey?: AttributeKey;
+  focusId?: string;
 }
 
-export type ActivityLogType = 'workout' | 'quest' | 'attribute' | 'level';
+/** Which day and week the current quests belong to, and the daily streak. */
+export interface QuestCycle {
+  /** Local day of the daily quests, "YYYY-MM-DD". */
+  dayKey: string;
+  /** Local Monday of the weekly quests, "YYYY-MM-DD". */
+  weekKey: string;
+  /** Days in a row with at least one daily quest done. */
+  streak: number;
+  /** Last day a daily quest was done, or null. */
+  lastActiveDay: string | null;
+}
+
+export type ActivityLogType = 'workout' | 'quest' | 'attribute' | 'level' | 'penalty';
 
 export interface ActivityLogItem {
   id: string;
@@ -163,6 +178,8 @@ export interface ProgressState {
   trainingSessions: TrainingSession[];
   activityLog: ActivityLogItem[];
   lastLevelUp: LevelUpFeedback | null;
+  /** Missing on rows saved before rotating quests; set up on the next load. */
+  questCycle?: QuestCycle;
 }
 
 export interface ProgressUpdate {

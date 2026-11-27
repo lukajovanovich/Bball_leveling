@@ -15,6 +15,12 @@ import {
 } from '../../src/data/attributes';
 import { WORKOUTS } from '../../src/data/workouts';
 import { NETWORK_ERROR_MESSAGE } from '../../src/lib/authErrors';
+import {
+  buildDailyQuests,
+  buildWeeklyQuests,
+  createQuestCycle,
+  getAllDailyBonusXp
+} from '../../src/lib/quests';
 import { colors } from '../../src/theme/theme';
 import { newPlayerState } from '../helpers/fixtures';
 import { AppProviders, readProbe, renderApp } from '../helpers/renderApp';
@@ -30,6 +36,12 @@ jest.mock('../../src/lib/supabase', () => require('../helpers/supabaseMock'));
 const signInWith = (state = newPlayerState()) => {
   mockControls.startSignedIn(makeSession('user-1', 'one@example.com'));
   mockControls.setStoredProgress(state);
+};
+
+const lastSavedState = () => {
+  const calls = mockControls.upsert.mock.calls;
+
+  return calls[calls.length - 1][0].progress_state;
 };
 
 const lastSavedPlayer = () => {
@@ -488,6 +500,52 @@ describe('Train screen focus areas', () => {
     expect(
       screen.getByRole('button', { name: 'Pickup Game done for today' })
     ).toBeDisabled();
+  });
+});
+
+describe('Quests screen with rotating quests', () => {
+  const rotating = () => {
+    const base = newPlayerState();
+    const cycle = createQuestCycle(new Date());
+
+    return {
+      ...base,
+      quests: [
+        ...buildDailyQuests(base.player, cycle.dayKey),
+        ...buildWeeklyQuests(base.player, cycle.weekKey)
+      ],
+      questCycle: cycle
+    };
+  };
+
+  it('shows the streak, the all-three bonus and what each daily quest costs', async () => {
+    const state = rotating();
+    signInWith(state);
+    await renderApp(<QuestsScreen />);
+
+    expect(screen.getByText('Day streak')).toBeOnTheScreen();
+    expect(screen.getByText(`+${getAllDailyBonusXp(1)} XP`)).toBeOnTheScreen();
+    expect(screen.getByText('Skip the day: -100 XP')).toBeOnTheScreen();
+    expect(screen.getAllByText(/^Miss it: /)).toHaveLength(2);
+    expect(screen.getByText(state.quests[2].title)).toBeOnTheScreen();
+  });
+
+  it('completes the any-workout quest from the Train screen and starts the streak', async () => {
+    signInWith(rotating());
+    await renderApp(
+      <>
+        <TrainScreen />
+        <QuestsScreen />
+      </>
+    );
+
+    await fireEvent.press(screen.getByText('Pickup Game'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Log medium workout' }));
+
+    expect(screen.queryByText('Skip the day: -100 XP')).not.toBeOnTheScreen();
+    // the pickup game does not finish the area or focus quests
+    expect(screen.getAllByText(/^Miss it: /)).toHaveLength(2);
+    expect(lastSavedState().questCycle.streak).toBe(1);
   });
 });
 

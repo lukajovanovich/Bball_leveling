@@ -3,6 +3,7 @@ import {
   createProgressStateFromPlayer,
   createZeroAttributes
 } from '../../src/data/mockPlayer';
+import { createInitialQuests } from '../../src/data/quests';
 import { createDefaultMeasurements } from '../../src/lib/measurements';
 import { PendingSignupProfile } from '../../src/lib/pendingSignup';
 import { AttributeKey, PlayerAttributes, ProgressState } from '../../src/types';
@@ -39,7 +40,12 @@ export const newPlayerState = (
     attributes: attributesWith(attributeOverrides)
   };
 
-  return createProgressStateFromPlayer(player);
+  // The fixed classic quests keep the quest-mechanics tests readable; rotating
+  // quests are covered in __tests__/lib/quests.test.ts.
+  return {
+    ...createProgressStateFromPlayer(player),
+    quests: createInitialQuests(player.attributes)
+  };
 };
 
 export const deepFreeze = <T>(value: T): T => {

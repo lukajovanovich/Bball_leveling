@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState
 } from 'react';
+import { AppState } from 'react-native';
 import {
   buildNewPlayerProfile,
   createInitialProgressState,
@@ -26,6 +27,7 @@ import {
   fetchPlayerProgressState,
   upsertPlayerProgressState
 } from '../lib/playerProfileStore';
+import { refreshQuests } from '../lib/quests';
 import {
   applyWorkoutToProgress,
   calculateOvr,
@@ -220,9 +222,31 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
           clearPendingSignupProfile();
         }
 
-        setState(data);
+        // Days that passed since the last visit settle their quests now; the
+        // row was just read, so saving the result is safe.
+        const refreshed = refreshQuests(data);
+        setState(refreshed);
         setSyncError(null);
         finishHydrating();
+
+        if (refreshed !== data) {
+          try {
+            const { error } = await upsertPlayerProgressState(
+              user.id,
+              user.email ?? null,
+              refreshed
+            );
+
+            if (active && error) {
+              setSyncError(describeError(error));
+            }
+          } catch (error) {
+            if (active) {
+              setSyncError(describeError(error));
+            }
+          }
+        }
+
         return;
       }
 
@@ -283,6 +307,39 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
     };
   }, [isAuthLoading, isConfigured, userId]);
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Midnight can pass while the app stays open: check every minute and when
+  // the app comes back to the foreground.
+  useEffect(() => {
+    if (isHydrating || needsPlayerSetup) {
+      return;
+    }
+
+    const rollOver = () => {
+      const current = stateRef.current;
+      const refreshed = refreshQuests(current);
+
+      if (refreshed !== current) {
+        setState(refreshed);
+        void persistProgressState(refreshed);
+      }
+    };
+
+    const intervalId = setInterval(rollOver, 60 * 1000);
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        rollOver();
+      }
+    });
+
+    return () => {
+      clearInterval(intervalId);
+      subscription.remove();
+    };
+  }, [isHydrating, needsPlayerSetup, persistProgressState]);
+
   const logWorkout = useCallback(
     (workoutType: WorkoutType, intensity: WorkoutIntensity, focus?: readonly string[]) => {
       const status = getDailyWorkoutStatus(state.trainingSessions);
@@ -291,7 +348,9 @@ export const ProgressProvider = ({ children }: PropsWithChildren) => {
         return null;
       }
 
-      const update = applyWorkoutToProgress(state, workoutType, intensity, focus);
+      // A workout logged just after midnight belongs to the new day's quests.
+      const current = refreshQuests(state);
+      const update = applyWorkoutToProgress(current, workoutType, intensity, focus);
       setState(update.state);
       void persistProgressState(update.state);
       return update;

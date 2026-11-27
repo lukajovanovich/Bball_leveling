@@ -6,11 +6,17 @@ import {
   getPendingSignupProfile,
   savePendingSignupProfile
 } from '../../src/lib/pendingSignup';
-import { calculateOvr, getLevelInfo } from '../../src/lib/progression';
+import { calculateOvr, getLevelInfo, getLocalDayKey } from '../../src/lib/progression';
+import {
+  MISSED_DAY_XP_PENALTY,
+  buildDailyQuests,
+  buildWeeklyQuests,
+  createQuestCycle
+} from '../../src/lib/quests';
 import { AuthProvider, useAuth } from '../../src/store/AuthContext';
 import { ProgressProvider, useProgress } from '../../src/store/ProgressContext';
 import { ProgressState } from '../../src/types';
-import { newPlayerState, signupProfile } from '../helpers/fixtures';
+import { attributesWith, newPlayerState, signupProfile } from '../helpers/fixtures';
 import {
   makeGoogleSession,
   makeSession,
@@ -138,6 +144,35 @@ describe('loading a signed-in player', () => {
     expect(result.current.progress.player.attributes.speed).toBe(33);
     expect(result.current.progress.syncError).toBeNull();
     expect(mockControls.upsert).not.toHaveBeenCalled();
+  });
+
+  it('settles yesterday\'s missed quests on load and saves the result', async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const base = newPlayerState(attributesWith({}, 50), 700);
+    const cycle = createQuestCycle(yesterday);
+    const stored = {
+      ...base,
+      quests: [
+        ...buildDailyQuests(base.player, cycle.dayKey),
+        ...buildWeeklyQuests(base.player, cycle.weekKey)
+      ],
+      questCycle: cycle
+    };
+    mockControls.startSignedIn(makeSession('user-1'));
+    mockControls.setStoredProgress(stored);
+
+    const { result } = await renderProgress();
+
+    await waitFor(() => expect(mockControls.upsert).toHaveBeenCalledTimes(1));
+    const progress = result.current.progress;
+    const focusKey = stored.quests[2].attributeKey!;
+
+    expect(progress.state.questCycle?.dayKey).toBe(getLocalDayKey(new Date()));
+    expect(progress.player.totalXp).toBe(700 - MISSED_DAY_XP_PENALTY);
+    expect(progress.player.attributes[focusKey]).toBe(49);
+    expect(savedState().questCycle?.dayKey).toBe(getLocalDayKey(new Date()));
+    expect(savedState().player.totalXp).toBe(700 - MISSED_DAY_XP_PENALTY);
   });
 
   it('drops a leftover signup profile once a cloud save exists', async () => {

@@ -15,6 +15,7 @@ import {
   WorkoutType
 } from '../types';
 import { colors } from '../theme/theme';
+import { applyDailyQuestOutcome, sessionMatchesFocusQuest } from './quests';
 
 export const ATTRIBUTE_MIN = 0;
 export const ATTRIBUTE_MAX = 99;
@@ -364,7 +365,8 @@ const updateQuestProgress = (
   quest: Quest,
   workoutType: WorkoutType,
   nextAttributes: PlayerAttributes,
-  gains: Partial<Record<AttributeKey, number>>
+  gains: Partial<Record<AttributeKey, number>>,
+  focus: readonly string[]
 ) => {
   if (quest.completed && quest.claimed) {
     return quest;
@@ -386,6 +388,10 @@ const updateQuestProgress = (
 
   if (quest.kind === 'improve_attribute' && quest.attributeKey) {
     progress += gains[quest.attributeKey] ?? 0;
+  }
+
+  if (sessionMatchesFocusQuest(quest, workoutType, focus)) {
+    progress += 1;
   }
 
   const completed = progress >= quest.goal;
@@ -414,7 +420,8 @@ export const applyWorkoutToProgress = (
   state: ProgressState,
   workoutType: WorkoutType,
   intensity: WorkoutIntensity,
-  focus: readonly string[] = []
+  focus: readonly string[] = [],
+  now: Date = new Date()
 ): ProgressUpdate => {
   const workout = getWorkoutDefinition(workoutType);
   const pickedFocus = normalizeWorkoutFocus(workout, focus);
@@ -438,7 +445,8 @@ export const applyWorkoutToProgress = (
       quest,
       workoutType,
       nextAttributes,
-      result.attributeGains
+      result.attributeGains,
+      pickedFocus
     );
 
     // Also covers quests that were already complete when they were created
@@ -452,6 +460,14 @@ export const applyWorkoutToProgress = (
     return updatedQuest;
   });
 
+  // Streak and the bonus for finishing every daily quest. Rows from before
+  // rotating quests have no cycle yet; they get one on the next quest refresh.
+  const dailyOutcome = state.questCycle
+    ? applyDailyQuestOutcome(state.questCycle, state.quests, quests, now)
+    : null;
+  const allDailyBonusXp = dailyOutcome?.bonusXp ?? 0;
+  questXpGained += allDailyBonusXp;
+
   const totalXpGained = result.xpGained + questXpGained;
   const nextTotalXp = state.player.totalXp + totalXpGained;
   const afterLevel = getLevelInfo(nextTotalXp).level;
@@ -463,7 +479,7 @@ export const applyWorkoutToProgress = (
         }
       : null;
 
-  const completedAt = new Date().toISOString();
+  const completedAt = now.toISOString();
   const session: TrainingSession = {
     id: createId('session'),
     workoutType,
@@ -476,14 +492,28 @@ export const applyWorkoutToProgress = (
     ...(pickedFocus.length > 0 ? { focus: pickedFocus } : {})
   };
 
-  const questActivity = completedQuests.map((quest) => ({
-    id: createId(`activity-${quest.id}`),
-    type: 'quest' as const,
-    title: `${quest.period === 'daily' ? 'Daily' : 'Weekly'} quest completed`,
-    description: `${quest.title} paid out +${quest.rewardXp} XP.`,
-    createdAt: completedAt,
-    accentColor: colors.gold
-  }));
+  const questActivity = [
+    ...(allDailyBonusXp > 0 && dailyOutcome
+      ? [
+          {
+            id: createId('activity-all-daily'),
+            type: 'quest' as const,
+            title: 'All daily quests done',
+            description: `Day ${dailyOutcome.cycle.streak} of your streak paid a +${allDailyBonusXp} XP bonus.`,
+            createdAt: completedAt,
+            accentColor: colors.gold
+          }
+        ]
+      : []),
+    ...completedQuests.map((quest) => ({
+      id: createId(`activity-${quest.id}`),
+      type: 'quest' as const,
+      title: `${quest.period === 'daily' ? 'Daily' : 'Weekly'} quest completed`,
+      description: `${quest.title} paid out +${quest.rewardXp} XP.`,
+      createdAt: completedAt,
+      accentColor: colors.gold
+    }))
+  ];
 
   const newActivities = [
     ...(levelUp
@@ -527,6 +557,7 @@ export const applyWorkoutToProgress = (
       totalXp: nextTotalXp
     },
     quests,
+    ...(dailyOutcome ? { questCycle: dailyOutcome.cycle } : {}),
     trainingSessions: [session, ...state.trainingSessions].slice(0, 30),
     activityLog: [...newActivities, ...state.activityLog].slice(0, 40),
     lastLevelUp: levelUp
