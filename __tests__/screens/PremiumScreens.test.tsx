@@ -243,7 +243,7 @@ describe('Profile premium card (test mode)', () => {
     expect(await screen.findByText("You're on Premium")).toBeOnTheScreen();
     expect(screen.queryByText('$5 a month')).not.toBeOnTheScreen();
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Switch back to free' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel Premium' }));
 
     expect(mockControls.rpc).toHaveBeenLastCalledWith('set_test_plan', { new_plan: 'free' });
     expect(await screen.findByRole('button', { name: 'Upgrade to Premium' })).toBeOnTheScreen();

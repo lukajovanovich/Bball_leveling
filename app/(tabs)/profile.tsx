@@ -160,7 +160,7 @@ export default function ProfileScreen() {
             style={({ pressed }) => [styles.planSecondary, pressed && styles.planSecondaryPressed]}
           >
             <Text style={styles.planSecondaryText}>
-              {planBusy ? 'Switching...' : 'Switch back to free'}
+              {planBusy ? 'Cancelling...' : 'Cancel Premium'}
             </Text>
           </Pressable>
         ) : (
