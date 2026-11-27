@@ -90,6 +90,32 @@ describe('readTrainingDescription', () => {
     });
   });
 
+  it('shows other server failures as a readable message', async () => {
+    mockControls.invoke.mockResolvedValue({
+      data: null,
+      error: { name: 'FunctionsHttpError', message: 'Server exploded', context: { status: 500 } }
+    });
+    expect(await readTrainingDescription('shooting')).toEqual({
+      ok: false,
+      message: 'Server exploded'
+    });
+
+    mockControls.invoke.mockResolvedValue({ data: { status: 'error' }, error: null });
+    expect(await readTrainingDescription('shooting')).toEqual({
+      ok: false,
+      message: 'Could not read your training right now. Try again.'
+    });
+
+    mockControls.invoke.mockResolvedValue({
+      data: { status: 'error', message: 'The training reader is busy right now.' },
+      error: null
+    });
+    expect(await readTrainingDescription('shooting')).toEqual({
+      ok: false,
+      message: 'The training reader is busy right now.'
+    });
+  });
+
   it('does not call the server for empty text', async () => {
     expect(await readTrainingDescription('   ')).toEqual({
       ok: false,

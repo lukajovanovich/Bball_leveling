@@ -133,6 +133,53 @@ describe('Describe your training', () => {
     ).toEqual(['game', 'shooting']);
   });
 
+  it('applies a changed intensity and skips a workout already done today', async () => {
+    const state = newPlayerState();
+    // shooting twice today: done and the bonus is used
+    const today = new Date().toISOString();
+    const session = (id: string) => ({
+      id,
+      workoutType: 'shooting' as const,
+      intensity: 'medium' as const,
+      xpGained: 120,
+      questXpGained: 0,
+      attributeGains: {},
+      completedAt: today
+    });
+    signInWith('premium', { ...state, trainingSessions: [session('s1'), session('s2')] });
+    mockControls.invoke.mockResolvedValue({
+      data: {
+        status: 'ok',
+        workouts: [
+          { workoutType: 'shooting', intensity: 'medium', focus: [], note: '' },
+          { workoutType: 'defense', intensity: 'medium', focus: [], note: '' }
+        ]
+      },
+      error: null
+    });
+    await renderApp(<DescribeTrainingScreen />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('What did you train today?')).toBeOnTheScreen()
+    );
+    await fireEvent.changeText(screen.getByLabelText('What did you train today?'), 'x');
+    await fireEvent.press(screen.getByRole('button', { name: 'Read my training' }));
+
+    expect(await screen.findByText('Already done today, will be skipped')).toBeOnTheScreen();
+    // pick Hard for the defense entry (second set of intensity buttons)
+    await fireEvent.press(screen.getAllByRole('button', { name: 'Hard' })[1]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Log 2 workouts' }));
+
+    expect(
+      screen.getByText("Logged 1 workout. Skipped for today's limit: Shooting Workout.")
+    ).toBeOnTheScreen();
+    await waitFor(() => expect(mockControls.upsert).toHaveBeenCalledTimes(1));
+    expect(lastSavedState().trainingSessions[0]).toMatchObject({
+      workoutType: 'defense',
+      intensity: 'hard'
+    });
+  });
+
   it('marks the demo reading while the AI is not set up', async () => {
     signInWith('premium');
     await renderApp(<DescribeTrainingScreen />);
