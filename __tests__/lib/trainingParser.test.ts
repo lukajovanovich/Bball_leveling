@@ -70,6 +70,16 @@ describe('demoParseTraining', () => {
     expect(workouts.map((item) => item.workoutType)).toEqual(['shooting', 'game']);
   });
 
+  it.each(['100 3 pointers', 'fifty 3-pointers', '3pt shooting', 'three point work'])(
+    'reads "%s" as three-point shooting',
+    (text) => {
+      expect(demoParseTraining(text)[0]).toMatchObject({
+        workoutType: 'shooting',
+        focus: ['threePointers']
+      });
+    }
+  );
+
   it('finds nothing in text about something else', () => {
     expect(demoParseTraining('Went to the cinema and had pizza')).toEqual([]);
   });

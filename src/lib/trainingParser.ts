@@ -77,10 +77,10 @@ export const validateParsedWorkouts = (raw: unknown): ParsedWorkout[] => {
 const KEYWORDS: { type: WorkoutType; words: RegExp; focus?: { id: string; words: RegExp }[] }[] = [
   {
     type: 'shooting',
-    words: /shoot|shot|three|3s|3pt|mid-?range|free throw|jumper|fade|sut|trojk|poludistan/i,
+    words: /shoot|shot|three|3s|3[\s-]?p(oin)?t|mid-?range|free throw|jumper|fade|sut|šut|trojk|poludistan/i,
     focus: [
       { id: 'midRange', words: /mid-?range|poludistan/i },
-      { id: 'threePointers', words: /three|3s|3pt|trojk/i },
+      { id: 'threePointers', words: /three|3s|3[\s-]?p(oin)?t|trojk/i },
       { id: 'freeThrows', words: /free throw|slobodn/i },
       { id: 'offDribble', words: /fade|off the dribble|pull-?up|iz pokreta/i }
     ]

@@ -144,7 +144,7 @@ describe('Describe your training', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Read my training' }));
 
     expect(
-      await screen.findByText('Demo reading: simple keyword matching until the AI is switched on.')
+      await screen.findByText("Demo reading: the AI isn't available yet, so this uses simple keyword matching.")
     ).toBeOnTheScreen();
   });
 

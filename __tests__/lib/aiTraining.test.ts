@@ -53,6 +53,20 @@ describe('readTrainingDescription', () => {
     expect(await readTrainingDescription('shooting')).toMatchObject({ ok: true, demo: true });
   });
 
+  it('falls back to the demo reading when the browser cannot reach the function', async () => {
+    mockControls.invoke.mockResolvedValue({
+      data: null,
+      error: { name: 'FunctionsFetchError', message: 'Failed to send a request to the Edge Function' }
+    });
+
+    const result = await readTrainingDescription('Today I made 100 3 pointers');
+
+    expect(result).toMatchObject({ ok: true, demo: true });
+    expect(result.ok && result.workouts).toEqual([
+      { workoutType: 'shooting', intensity: 'medium', focus: ['threePointers'], note: '' }
+    ]);
+  });
+
   it('explains when the player is not premium or out of reads', async () => {
     mockControls.invoke.mockResolvedValue({ data: { status: 'not_premium' }, error: null });
     expect(await readTrainingDescription('shooting')).toEqual({

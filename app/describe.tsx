@@ -148,7 +148,7 @@ export default function DescribeTrainingScreen() {
           </Text>
           {demo ? (
             <Text style={styles.demo}>
-              Demo reading: simple keyword matching until the AI is switched on.
+              Demo reading: the AI isn't available yet, so this uses simple keyword matching.
             </Text>
           ) : null}
           {workouts.length === 0 ? (

@@ -44,12 +44,14 @@ export const readTrainingDescription = async (text: string): Promise<TrainingRea
 
     data = (response.data ?? null) as FunctionResponse | null;
 
-    // A function that is not deployed yet answers 404; treat it like a
-    // missing AI key so the screen still works in demo mode.
+    // A function that is not deployed yet answers 404 (native) or cannot be
+    // reached at all (web: the browser blocks the request). Either way the
+    // player still gets the demo reading, labelled as such, instead of an
+    // error they cannot do anything about.
     if (response.error && !data) {
-      const status = (response.error as { context?: { status?: number } }).context?.status;
+      const error = response.error as { name?: string; context?: { status?: number } };
 
-      if (status === 404) {
+      if (error.context?.status === 404 || error.name === 'FunctionsFetchError') {
         return { ok: true, workouts: demoParseTraining(trimmed), demo: true };
       }
 
