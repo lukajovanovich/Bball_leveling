@@ -6,7 +6,8 @@
 //   ANTHROPIC_API_KEY   required for real AI reads; without it the function
 //                       answers { status: 'not_configured' } and the app falls
 //                       back to its demo reading
-//   ANTHROPIC_MODEL     optional, defaults to claude-opus-5-5
+//   ANTHROPIC_MODEL     optional, defaults to claude-haiku-5-5 (cheapest);
+//                       e.g. claude-opus-5-5 for the most capable reading
 //   AI_DAILY_LIMIT      optional, reads per player per 24 hours, default 10
 // SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are provided
 // by Supabase automatically.
@@ -17,7 +18,9 @@ import { z } from 'npm:zod@4.6.7';
 import { createClient } from 'npm:@supabase/supabase-js@2.119.2';
 
 const MAX_TEXT_LENGTH = 1500;
-const MODEL = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-opus-5-5';
+const MODEL = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-5-5';
+// Haiku has no server-side fallback model; the larger models do.
+const USE_FALLBACK = !MODEL.startsWith('claude-haiku');
 const DAILY_LIMIT = Number(Deno.env.get('AI_DAILY_LIMIT') ?? '10');
 
 const corsHeaders = {
@@ -144,8 +147,9 @@ Deno.serve(async (request) => {
       // A short extraction: low effort keeps it fast and cheap.
       output_config: { effort: 'low', format: betaZodOutputFormat(ReadingSchema) },
       // If the main model declines, Anthropic retries on a suitable model.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
+      ...(USE_FALLBACK
+        ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }
+        : {}),
       system: SYSTEM_PROMPT,
       messages: [
         {
